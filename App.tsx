@@ -1,116 +1,141 @@
-import React, { useState } from 'react'
-import { View, Text, TouchableOpacity, StyleSheet, Platform } from 'react-native'
+import React, { useEffect, useState } from 'react'
+import { SafeAreaView, StatusBar, ActivityIndicator, View, Text, TouchableOpacity } from 'react-native'
+import { supabase } from './src/lib/supabase'
+import Login from './src/screens/Login'
+import SignUp from './src/screens/SignUp'
+import GirlDashboard from './src/screens/GirlDashboard'
+import BoyDashboard from './src/screens/BoyDashboard'
+import ParentDashboard from './src/screens/ParentDashboard'
+
+type Screen = 'login' | 'signup'
 
 export default function App() {
-  const [selectedRole, setSelectedRole] = useState<string | null>(null)
+  const [loading, setLoading] = useState(true)
+  const [currentScreen, setCurrentScreen] = useState<Screen>('login')
+  const [userRole, setUserRole] = useState<string | null>(null)
+  const [isLoggedIn, setIsLoggedIn] = useState(false)
 
-  // If a role is selected, show a temporary confirmation
-  if (selectedRole) {
+  useEffect(() => {
+    checkUser()
+  }, [])
+
+  const checkUser = async () => {
+    try {
+      const { data: { session } } = await supabase.auth.getSession()
+      
+      if (session?.user) {
+        console.log('Session user ID:', session.user.id)
+        
+        // Get profile
+        const { data: profile, error } = await supabase
+          .from('profiles')
+          .select('role')
+          .eq('id', session.user.id)
+          .single()
+        
+        if (error) {
+          console.log('Profile error:', error)
+        }
+        
+        if (profile?.role) {
+          console.log('Found role:', profile.role)
+          setUserRole(profile.role)
+          setIsLoggedIn(true)
+        } else {
+          console.log('No profile found for user')
+          setIsLoggedIn(false)
+        }
+      } else {
+        setIsLoggedIn(false)
+      }
+    } catch (err) {
+      console.log('Check user error:', err)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const handleLogin = () => {
+    checkUser()
+  }
+
+  const handleLogout = async () => {
+    await supabase.auth.signOut()
+    setIsLoggedIn(false)
+    setUserRole(null)
+    setCurrentScreen('login')
+  }
+
+  if (loading) {
     return (
-      <View style={styles.container}>
-        <Text style={styles.title}>MyCare+</Text>
-        <Text style={styles.confirmText}>You selected: {selectedRole}</Text>
-        <TouchableOpacity onPress={() => setSelectedRole(null)} style={styles.backButton}>
-          <Text style={styles.backButtonText}>← Back</Text>
-        </TouchableOpacity>
+      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+        <ActivityIndicator size="large" color="#e91e63" />
       </View>
     )
   }
 
-  // Role selection screen
+  if (!isLoggedIn) {
+    if (currentScreen === 'signup') {
+      return (
+        <SafeAreaView style={{ flex: 1 }}>
+          <StatusBar barStyle="dark-content" />
+          <SignUp onSignUpComplete={() => setCurrentScreen('login')} />
+        </SafeAreaView>
+      )
+    }
+    
+    return (
+      <SafeAreaView style={{ flex: 1 }}>
+        <StatusBar barStyle="dark-content" />
+        <Login onLogin={handleLogin} />
+        <TouchableOpacity 
+          style={{ position: 'absolute', bottom: 30, left: 0, right: 0, alignItems: 'center' }}
+          onPress={() => setCurrentScreen('signup')}
+        >
+          <Text style={{ color: '#e91e63', fontSize: 14 }}>Don't have an account? Sign Up</Text>
+        </TouchableOpacity>
+      </SafeAreaView>
+    )
+  }
+
+  console.log('Rendering dashboard for role:', userRole)
+
+  if (userRole === 'girl') {
+    return (
+      <SafeAreaView style={{ flex: 1 }}>
+        <StatusBar barStyle="dark-content" />
+        <GirlDashboard onLogout={handleLogout} />
+      </SafeAreaView>
+    )
+  }
+
+  if (userRole === 'boy') {
+    return (
+      <SafeAreaView style={{ flex: 1 }}>
+        <StatusBar barStyle="dark-content" />
+        <BoyDashboard onLogout={handleLogout} />
+      </SafeAreaView>
+    )
+  }
+
+  if (userRole === 'parent') {
+    return (
+      <SafeAreaView style={{ flex: 1 }}>
+        <StatusBar barStyle="dark-content" />
+        <ParentDashboard onLogout={handleLogout} />
+      </SafeAreaView>
+    )
+  }
+
   return (
-    <View style={styles.container}>
-      <Text style={styles.title}>MyCare+</Text>
-      <Text style={styles.subtitle}>Choose your role</Text>
-
-      <TouchableOpacity 
-        onPress={() => setSelectedRole('Girl / Woman')} 
-        style={[styles.roleButton, styles.girlButton]}
-      >
-        <Text style={styles.roleButtonText}>👩 Girl / Woman</Text>
-        <Text style={styles.roleDescription}>Track cycles, order pads, health info</Text>
-      </TouchableOpacity>
-
-      <TouchableOpacity 
-        onPress={() => setSelectedRole('Boy / Man')} 
-        style={[styles.roleButton, styles.boyButton]}
-      >
-        <Text style={styles.roleButtonText}>👨 Boy / Man</Text>
-        <Text style={styles.roleDescription}>HIV prevention, condoms, health info</Text>
-      </TouchableOpacity>
-
-      <TouchableOpacity 
-        onPress={() => setSelectedRole('Parent')} 
-        style={[styles.roleButton, styles.parentButton]}
-      >
-        <Text style={styles.roleButtonText}>👨‍👩‍👧 Parent / Guardian</Text>
-        <Text style={styles.roleDescription}>Track children, family supplies</Text>
-      </TouchableOpacity>
-    </View>
+    <SafeAreaView style={{ flex: 1 }}>
+      <StatusBar barStyle="dark-content" />
+      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', padding: 20 }}>
+        <Text style={{ fontSize: 18, marginBottom: 20 }}>No role assigned. Role: {userRole}</Text>
+        <TouchableOpacity onPress={handleLogout} style={{ backgroundColor: '#e91e63', padding: 15, borderRadius: 10 }}>
+          <Text style={{ color: '#fff' }}>Logout</Text>
+        </TouchableOpacity>
+      </View>
+    </SafeAreaView>
   )
 }
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: '#fff',
-    padding: 20,
-  },
-  title: {
-    fontSize: 36,
-    fontWeight: 'bold',
-    color: '#e91e63',
-    marginBottom: 10,
-  },
-  subtitle: {
-    fontSize: 18,
-    color: '#666',
-    marginBottom: 40,
-  },
-  roleButton: {
-    width: '100%',
-    padding: 20,
-    borderRadius: 15,
-    marginBottom: 15,
-    alignItems: 'center',
-  },
-  girlButton: {
-    backgroundColor: '#fce4ec',
-    borderWidth: 1,
-    borderColor: '#e91e63',
-  },
-  boyButton: {
-    backgroundColor: '#e3f2fd',
-    borderWidth: 1,
-    borderColor: '#2196f3',
-  },
-  parentButton: {
-    backgroundColor: '#e8f5e9',
-    borderWidth: 1,
-    borderColor: '#4caf50',
-  },
-  roleButtonText: {
-    fontSize: 20,
-    fontWeight: '600',
-    marginBottom: 5,
-  },
-  roleDescription: {
-    fontSize: 12,
-    color: '#666',
-  },
-  confirmText: {
-    fontSize: 20,
-    marginBottom: 20,
-    textAlign: 'center',
-  },
-  backButton: {
-    marginTop: 20,
-    padding: 10,
-  },
-  backButtonText: {
-    color: '#e91e63',
-    fontSize: 16,
-  },
-})
