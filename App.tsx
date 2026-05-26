@@ -6,6 +6,7 @@ import SignUp from './src/screens/SignUp'
 import GirlDashboard from './src/screens/GirlDashboard'
 import BoyDashboard from './src/screens/BoyDashboard'
 import ParentDashboard from './src/screens/ParentDashboard'
+import AdminDashboard from './src/screens/AdminDashboard'
 
 type Screen = 'login' | 'signup'
 
@@ -26,20 +27,17 @@ export default function App() {
       if (session?.user) {
         console.log('Session user ID:', session.user.id)
         
-        // Get profile
         const { data: profile, error } = await supabase
           .from('profiles')
           .select('role')
           .eq('id', session.user.id)
-          .single()
         
-        if (error) {
-          console.log('Profile error:', error)
-        }
+        console.log('Profile data:', profile)
+        console.log('Profile error:', error)
         
-        if (profile?.role) {
-          console.log('Found role:', profile.role)
-          setUserRole(profile.role)
+        if (profile && profile.length > 0) {
+          console.log('Found role:', profile[0].role)
+          setUserRole(profile[0].role)
           setIsLoggedIn(true)
         } else {
           console.log('No profile found for user')
@@ -99,6 +97,15 @@ export default function App() {
   }
 
   console.log('Rendering dashboard for role:', userRole)
+
+  if (userRole === 'admin') {
+    return (
+      <SafeAreaView style={{ flex: 1 }}>
+        <StatusBar barStyle="dark-content" />
+        <AdminDashboard onLogout={handleLogout} />
+      </SafeAreaView>
+    )
+  }
 
   if (userRole === 'girl') {
     return (
