@@ -30,7 +30,7 @@ export default function Login({ onLogin }: { onLogin: () => void }) {
       console.log('USER ID FROM AUTH:', data.user.id)
       console.log('USER EMAIL:', data.user.email)
       
-      // Try to get profile
+      // Get profile
       const { data: profile, error: profileError } = await supabase
         .from('profiles')
         .select('*')
