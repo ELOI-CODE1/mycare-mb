@@ -20,16 +20,34 @@ type Product = {
   name: string
   description: string
   price: number
+  visible_to: string[]
+}
+
+type Order = {
+  id: number
+  product_id: number
+  product_name: string
+  quantity: number
+  total_price: number
+  status: string
+  created_at: string
 }
 
 export default function ParentDashboard({ onLogout }: { onLogout: () => void }) {
   const [userId, setUserId] = useState<string | null>(null)
+  const [activeTab, setActiveTab] = useState<'children' | 'products' | 'orders'>('children')
   const [children, setChildren] = useState<Child[]>([])
   const [selectedChild, setSelectedChild] = useState<Child | null>(null)
   const [childCycles, setChildCycles] = useState<ChildCycle[]>([])
+  const [products, setProducts] = useState<Product[]>([])
+  const [orders, setOrders] = useState<Order[]>([])
   const [showAddChild, setShowAddChild] = useState(false)
   const [showPeriodModal, setShowPeriodModal] = useState(false)
   const [showCycleHistory, setShowCycleHistory] = useState(false)
+  const [showOrderModal, setShowOrderModal] = useState(false)
+  const [selectedProduct, setSelectedProduct] = useState<Product | null>(null)
+  const [quantity, setQuantity] = useState('1')
+  const [deliveryAddress, setDeliveryAddress] = useState('')
   const [childName, setChildName] = useState('')
   const [childDob, setChildDob] = useState('')
   const [childRole, setChildRole] = useState('girl')
@@ -39,6 +57,7 @@ export default function ParentDashboard({ onLogout }: { onLogout: () => void }) 
 
   useEffect(() => {
     getUserId()
+    loadProducts()
   }, [])
 
   const getUserId = async () => {
@@ -46,6 +65,52 @@ export default function ParentDashboard({ onLogout }: { onLogout: () => void }) 
     if (user) {
       setUserId(user.id)
       loadChildren(user.id)
+      loadOrders(user.id)
+      loadUserProfile(user.id)
+    }
+  }
+
+  const loadUserProfile = async (userId: string) => {
+    const { data, error } = await supabase
+      .from('profiles')
+      .select('delivery_address')
+      .eq('id', userId)
+      .single()
+    
+    if (!error && data?.delivery_address) {
+      setDeliveryAddress(data.delivery_address)
+    }
+  }
+
+  const loadProducts = async () => {
+    const { data, error } = await supabase
+      .from('products')
+      .select('*')
+      .contains('visible_to', ['parent'])
+      .eq('is_available', true)
+    
+    if (error) {
+      console.error('Error loading products:', error)
+    } else {
+      setProducts(data || [])
+    }
+  }
+
+  const loadOrders = async (userId: string) => {
+    const { data, error } = await supabase
+      .from('orders')
+      .select('*, products(name)')
+      .eq('user_id', userId)
+      .order('created_at', { ascending: false })
+    
+    if (error) {
+      console.error('Error loading orders:', error)
+    } else if (data) {
+      const formattedOrders = data.map(order => ({
+        ...order,
+        product_name: order.products?.name || 'Unknown'
+      }))
+      setOrders(formattedOrders)
     }
   }
 
@@ -108,6 +173,46 @@ export default function ParentDashboard({ onLogout }: { onLogout: () => void }) 
     }
     
     setPrediction(`${selectedChild?.name}'s next period expected in ${daysUntil} days (around ${nextPeriod.toISOString().split('T')[0]})`)
+  }
+
+  const placeOrder = async () => {
+    if (!selectedProduct) return
+    
+    const qty = parseInt(quantity)
+    if (isNaN(qty) || qty < 1) {
+      Alert.alert('Error', 'Please enter a valid quantity')
+      return
+    }
+    
+    if (!deliveryAddress.trim()) {
+      Alert.alert('Error', 'Please enter delivery address')
+      return
+    }
+    
+    const totalPrice = selectedProduct.price * qty
+    
+    const { error } = await supabase
+      .from('orders')
+      .insert({
+        user_id: userId,
+        product_id: selectedProduct.id,
+        quantity: qty,
+        total_price: totalPrice,
+        delivery_address: deliveryAddress,
+        status: 'pending',
+        payment_method: 'cash_on_delivery',
+        payment_status: 'unpaid'
+      })
+    
+    if (error) {
+      Alert.alert('Error', 'Failed to place order')
+      console.error(error)
+    } else {
+      Alert.alert('Success', 'Order placed successfully!')
+      setShowOrderModal(false)
+      setQuantity('1')
+      if (userId) loadOrders(userId)
+    }
   }
 
   const addChild = async () => {
@@ -201,56 +306,127 @@ export default function ParentDashboard({ onLogout }: { onLogout: () => void }) 
         </TouchableOpacity>
       </View>
 
-      {/* Children List */}
-      <View style={styles.section}>
-        <View style={styles.sectionHeader}>
-          <Text style={styles.sectionTitle}>My Children</Text>
-          <TouchableOpacity style={styles.addButton} onPress={() => setShowAddChild(true)}>
-            <Text style={styles.addButtonText}>+ Add Child</Text>
-          </TouchableOpacity>
-        </View>
-        
-        {children.length === 0 ? (
-          <Text style={styles.emptyText}>No children added yet. Tap "Add Child" to get started.</Text>
-        ) : (
-          children.map((child) => (
-            <View key={child.id} style={styles.childCard}>
-              <View style={styles.childInfo}>
-                <Text style={styles.childName}>{child.name}</Text>
-                <Text style={styles.childRole}>{child.role === 'girl' ? '👧 Daughter' : '👦 Son'}</Text>
-                {child.date_of_birth && (
-                  <Text style={styles.childDob}>DOB: {child.date_of_birth}</Text>
-                )}
-              </View>
-              <View style={styles.childActions}>
-                {child.role === 'girl' && (
-                  <TouchableOpacity 
-                    style={styles.periodButton}
-                    onPress={() => {
-                      setSelectedChild(child)
-                      setShowPeriodModal(true)
-                    }}
-                  >
-                    <Text style={styles.periodButtonText}>Log Period</Text>
-                  </TouchableOpacity>
-                )}
-                <TouchableOpacity 
-                  style={styles.trackButton}
-                  onPress={() => selectChild(child)}
-                >
-                  <Text style={styles.trackButtonText}>Track</Text>
-                </TouchableOpacity>
-                <TouchableOpacity 
-                  style={styles.deleteChildButton}
-                  onPress={() => deleteChild(child.id, child.name)}
-                >
-                  <Text style={styles.deleteChildButtonText}>🗑️</Text>
-                </TouchableOpacity>
-              </View>
-            </View>
-          ))
-        )}
+      {/* Tab Bar */}
+      <View style={styles.tabBar}>
+        <TouchableOpacity 
+          style={[styles.tab, activeTab === 'children' && styles.activeTab]}
+          onPress={() => setActiveTab('children')}
+        >
+          <Text style={styles.tabText}>Children</Text>
+        </TouchableOpacity>
+        <TouchableOpacity 
+          style={[styles.tab, activeTab === 'products' && styles.activeTab]}
+          onPress={() => setActiveTab('products')}
+        >
+          <Text style={styles.tabText}>Products</Text>
+        </TouchableOpacity>
+        <TouchableOpacity 
+          style={[styles.tab, activeTab === 'orders' && styles.activeTab]}
+          onPress={() => setActiveTab('orders')}
+        >
+          <Text style={styles.tabText}>Orders</Text>
+        </TouchableOpacity>
       </View>
+
+      {/* Children Tab */}
+      {activeTab === 'children' && (
+        <View>
+          <View style={styles.sectionHeader}>
+            <Text style={styles.sectionTitle}>My Children</Text>
+            <TouchableOpacity style={styles.addButton} onPress={() => setShowAddChild(true)}>
+              <Text style={styles.addButtonText}>+ Add Child</Text>
+            </TouchableOpacity>
+          </View>
+          
+          {children.length === 0 ? (
+            <Text style={styles.emptyText}>No children added yet. Tap "Add Child" to get started.</Text>
+          ) : (
+            children.map((child) => (
+              <View key={child.id} style={styles.childCard}>
+                <View style={styles.childInfo}>
+                  <Text style={styles.childName}>{child.name}</Text>
+                  <Text style={styles.childRole}>{child.role === 'girl' ? '👧 Daughter' : '👦 Son'}</Text>
+                  {child.date_of_birth && (
+                    <Text style={styles.childDob}>DOB: {child.date_of_birth}</Text>
+                  )}
+                </View>
+                <View style={styles.childActions}>
+                  {child.role === 'girl' && (
+                    <TouchableOpacity 
+                      style={styles.periodButton}
+                      onPress={() => {
+                        setSelectedChild(child)
+                        setShowPeriodModal(true)
+                      }}
+                    >
+                      <Text style={styles.periodButtonText}>Log Period</Text>
+                    </TouchableOpacity>
+                  )}
+                  <TouchableOpacity 
+                    style={styles.trackButton}
+                    onPress={() => selectChild(child)}
+                  >
+                    <Text style={styles.trackButtonText}>Track</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity 
+                    style={styles.deleteChildButton}
+                    onPress={() => deleteChild(child.id, child.name)}
+                  >
+                    <Text style={styles.deleteChildButtonText}>🗑️</Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
+            ))
+          )}
+        </View>
+      )}
+
+      {/* Products Tab */}
+      {activeTab === 'products' && (
+        <View>
+          <Text style={styles.sectionTitle}>All Products</Text>
+          {products.map((product) => (
+            <View key={product.id} style={styles.productCard}>
+              <View style={styles.productInfo}>
+                <Text style={styles.productName}>{product.name}</Text>
+                <Text style={styles.productDescription}>{product.description}</Text>
+                <Text style={styles.productPrice}>{product.price.toLocaleString()} RWF</Text>
+              </View>
+              <TouchableOpacity 
+                style={styles.orderButton}
+                onPress={() => {
+                  setSelectedProduct(product)
+                  setShowOrderModal(true)
+                }}
+              >
+                <Text style={styles.orderButtonText}>Order</Text>
+              </TouchableOpacity>
+            </View>
+          ))}
+        </View>
+      )}
+
+      {/* Orders Tab */}
+      {activeTab === 'orders' && (
+        <View>
+          <Text style={styles.sectionTitle}>Family Orders</Text>
+          {orders.length === 0 ? (
+            <Text style={styles.emptyText}>No orders yet</Text>
+          ) : (
+            orders.map((order) => (
+              <View key={order.id} style={styles.orderCard}>
+                <Text style={styles.orderProduct}>{order.product_name}</Text>
+                <Text>Quantity: {order.quantity}</Text>
+                <Text>Total: {order.total_price.toLocaleString()} RWF</Text>
+                <Text>Status: {order.status}</Text>
+                <Text style={styles.orderDate}>
+                  {new Date(order.created_at).toLocaleDateString()}
+                </Text>
+              </View>
+            ))
+          )}
+        </View>
+      )}
 
       {/* Child Cycle History Modal */}
       <Modal visible={showCycleHistory} animationType="slide" transparent>
@@ -374,6 +550,42 @@ export default function ParentDashboard({ onLogout }: { onLogout: () => void }) 
           </View>
         </View>
       </Modal>
+
+      {/* Order Modal */}
+      <Modal visible={showOrderModal} animationType="slide" transparent>
+        <View style={styles.modalContainer}>
+          <View style={styles.modalContent}>
+            <Text style={styles.modalTitle}>Place Order</Text>
+            {selectedProduct && (
+              <>
+                <Text style={styles.modalProduct}>{selectedProduct.name}</Text>
+                <Text style={styles.modalPrice}>{selectedProduct.price.toLocaleString()} RWF each</Text>
+                
+                <TextInput
+                  style={styles.input}
+                  placeholder="Quantity"
+                  value={quantity}
+                  onChangeText={setQuantity}
+                  keyboardType="numeric"
+                />
+                <TextInput
+                  style={styles.input}
+                  placeholder="Delivery Address (Kigali)"
+                  value={deliveryAddress}
+                  onChangeText={setDeliveryAddress}
+                />
+                
+                <TouchableOpacity style={styles.confirmButton} onPress={placeOrder}>
+                  <Text style={styles.confirmButtonText}>Confirm Order</Text>
+                </TouchableOpacity>
+                <TouchableOpacity style={styles.cancelButton} onPress={() => setShowOrderModal(false)}>
+                  <Text style={styles.cancelButtonText}>Cancel</Text>
+                </TouchableOpacity>
+              </>
+            )}
+          </View>
+        </View>
+      </Modal>
     </ScrollView>
   )
 }
@@ -403,8 +615,25 @@ const styles = StyleSheet.create({
     color: '#4caf50',
     fontSize: 14
   },
-  section: {
-    marginBottom: 20
+  tabBar: {
+    flexDirection: 'row',
+    marginBottom: 20,
+    backgroundColor: '#fff',
+    borderRadius: 10,
+    overflow: 'hidden'
+  },
+  tab: {
+    flex: 1,
+    paddingVertical: 12,
+    alignItems: 'center'
+  },
+  activeTab: {
+    backgroundColor: '#4caf50'
+  },
+  tabText: {
+    fontSize: 14,
+    fontWeight: '500',
+    color: '#333'
   },
   sectionHeader: {
     flexDirection: 'row',
@@ -414,7 +643,8 @@ const styles = StyleSheet.create({
   },
   sectionTitle: {
     fontSize: 18,
-    fontWeight: 'bold'
+    fontWeight: 'bold',
+    marginBottom: 15
   },
   addButton: {
     backgroundColor: '#4caf50',
@@ -488,6 +718,59 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontSize: 14
   },
+  productCard: {
+    backgroundColor: '#fff',
+    borderRadius: 10,
+    padding: 15,
+    marginBottom: 10,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center'
+  },
+  productInfo: {
+    flex: 1
+  },
+  productName: {
+    fontSize: 16,
+    fontWeight: '600',
+    marginBottom: 4
+  },
+  productDescription: {
+    fontSize: 12,
+    color: '#666',
+    marginBottom: 4
+  },
+  productPrice: {
+    fontSize: 14,
+    fontWeight: 'bold',
+    color: '#4caf50'
+  },
+  orderButton: {
+    backgroundColor: '#4caf50',
+    paddingHorizontal: 20,
+    paddingVertical: 10,
+    borderRadius: 8
+  },
+  orderButtonText: {
+    color: '#fff',
+    fontWeight: '600'
+  },
+  orderCard: {
+    backgroundColor: '#fff',
+    borderRadius: 10,
+    padding: 15,
+    marginBottom: 10
+  },
+  orderProduct: {
+    fontSize: 16,
+    fontWeight: '600',
+    marginBottom: 5
+  },
+  orderDate: {
+    fontSize: 10,
+    color: '#999',
+    marginTop: 5
+  },
   predictionCard: {
     backgroundColor: '#e8f5e9',
     padding: 15,
@@ -534,6 +817,18 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     marginBottom: 15,
     textAlign: 'center'
+  },
+  modalProduct: {
+    fontSize: 16,
+    fontWeight: '600',
+    textAlign: 'center',
+    marginBottom: 5
+  },
+  modalPrice: {
+    fontSize: 14,
+    color: '#4caf50',
+    textAlign: 'center',
+    marginBottom: 15
   },
   input: {
     backgroundColor: '#f5f5f5',
@@ -593,6 +888,17 @@ const styles = StyleSheet.create({
     marginTop: 15
   },
   closeButtonText: {
+    color: '#fff',
+    fontWeight: '600'
+  },
+  confirmButton: {
+    backgroundColor: '#4caf50',
+    padding: 12,
+    borderRadius: 8,
+    alignItems: 'center',
+    marginTop: 10
+  },
+  confirmButtonText: {
     color: '#fff',
     fontWeight: '600'
   }
