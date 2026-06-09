@@ -19,13 +19,13 @@ export type CycleLength = {
 };
 
 class PeriodPredictor {
-  private periodDates: PeriodDate[];
+  periodDates: PeriodDate[];
 
   constructor(periodDates: PeriodDate[]) {
     this.periodDates = [...periodDates].sort();
   }
 
-  private calculateCycleLengths(): CycleLength[] {
+  calculateCycleLengths(): CycleLength[] {
     const cycles: CycleLength[] = [];
     
     for (let i = 0; i < this.periodDates.length - 1; i++) {
@@ -43,7 +43,7 @@ class PeriodPredictor {
     return cycles;
   }
 
-  private calculateStandardDeviation(lengths: number[]): number {
+  calculateStandardDeviation(lengths: number[]): number {
     if (lengths.length < 2) return 0;
     
     const mean = lengths.reduce((a, b) => a + b, 0) / lengths.length;
@@ -53,19 +53,19 @@ class PeriodPredictor {
     return Math.sqrt(variance);
   }
 
-  private getIrregularityScore(cycleLengths: CycleLength[]): number {
+  getIrregularityScore(cycleLengths: CycleLength[]): number {
     const recentCycles = cycleLengths.slice(-6);
     const lengths = recentCycles.map(c => c.length);
     return this.calculateStandardDeviation(lengths);
   }
 
-  private classifyRegularity(variation: number): 'regular' | 'moderately_irregular' | 'highly_irregular' {
+  classifyRegularity(variation: number): 'regular' | 'moderately_irregular' | 'highly_irregular' {
     if (variation < 3) return 'regular';
     if (variation <= 7) return 'moderately_irregular';
     return 'highly_irregular';
   }
 
-  private weightedAveragePrediction(cycles: CycleLength[], weights: number[]): number {
+  weightedAveragePrediction(cycles: CycleLength[], weights: number[]): number {
     const recentCycles = cycles.slice(-weights.length);
     let weightedSum = 0;
     let weightSum = 0;
@@ -78,7 +78,7 @@ class PeriodPredictor {
     return weightedSum / weightSum;
   }
 
-  private medianPrediction(cycles: CycleLength[]): number {
+  medianPrediction(cycles: CycleLength[]): number {
     const recentCycles = cycles.slice(-6);
     const lengths = recentCycles.map(c => c.length).sort((a, b) => a - b);
     const mid = Math.floor(lengths.length / 2);
@@ -89,7 +89,7 @@ class PeriodPredictor {
     return lengths[mid];
   }
 
-  private detectCalendarPattern(): { exists: boolean; avgDayOfMonth: number } {
+  detectCalendarPattern(): { exists: boolean; avgDayOfMonth: number } {
     const lastPeriods = this.periodDates.slice(-6);
     const dayOfMonths: number[] = [];
     
@@ -112,7 +112,7 @@ class PeriodPredictor {
     return { exists: false, avgDayOfMonth: 0 };
   }
 
-  private calculateConfidence(variation: number, cycleCount: number): number {
+  calculateConfidence(variation: number, cycleCount: number): number {
     let base = 0.50;
     
     const cycleBonus = Math.min(cycleCount * 0.05, 0.30);
@@ -126,7 +126,7 @@ class PeriodPredictor {
     return Math.min(0.95, Math.max(0.30, base));
   }
 
-  private generateMessage(
+  generateMessage(
     regularity: 'regular' | 'moderately_irregular' | 'highly_irregular',
     confidence: number,
     method: string,
