@@ -48,13 +48,6 @@ export default function BoyDashboard() {
     <View style={styles.root}>
       <AppHeader role="boy" />
       <ScrollView style={styles.container}>
-      <View style={styles.infoCard}>
-        <Text style={styles.infoTitle}>HIV Prevention</Text>
-        <Text style={styles.infoText}>Use condoms correctly every time</Text>
-        <Text style={styles.infoText}>Get tested every 3 months</Text>
-        <TouchableOpacity style={styles.callButton}><Text style={styles.callButtonText}>Call 114</Text></TouchableOpacity>
-      </View>
-
       <View style={styles.tabBar}>
         {(['shop', 'orders'] as const).map(tab => (
           <TouchableOpacity key={tab} style={[styles.tab, activeTab === tab && styles.activeTab]} onPress={() => setActiveTab(tab)}>
@@ -96,11 +89,6 @@ export default function BoyDashboard() {
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: '#f5f5f5' },
   container: { flex: 1, padding: 20, backgroundColor: '#f5f5f5' },
-  infoCard: { backgroundColor: '#e3f2fd', padding: 15, borderRadius: 12, marginBottom: 20 },
-  infoTitle: { fontSize: 18, fontWeight: 'bold', color: '#2196f3' },
-  infoText: { fontSize: 14, color: '#333' },
-  callButton: { backgroundColor: '#2196f3', padding: 10, borderRadius: 8, marginTop: 10 },
-  callButtonText: { color: '#fff', textAlign: 'center' },
   tabBar: { flexDirection: 'row', marginBottom: 20 },
   tab: { flex: 1, padding: 10, alignItems: 'center', backgroundColor: '#ddd' },
   activeTab: { backgroundColor: '#2196f3' },
