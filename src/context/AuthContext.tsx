@@ -14,6 +14,7 @@ export type Profile = {
 
 type AuthContextValue = {
   loading: boolean // initial session check in progress
+  profileLoading: boolean // profile (role) fetch in progress
   session: Session | null
   user: User | null
   profile: Profile | null
@@ -27,6 +28,9 @@ const AuthContext = createContext<AuthContextValue | undefined>(undefined)
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [loading, setLoading] = useState(true)
+  // Starts true so a restored session shows the splash until the role is known
+  // (prevents a flash of the "No role assigned" screen on cold start).
+  const [profileLoading, setProfileLoading] = useState(true)
   const [session, setSession] = useState<Session | null>(null)
   const [profile, setProfile] = useState<Profile | null>(null)
 
@@ -74,10 +78,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   // Load the profile whenever the signed-in user changes.
   useEffect(() => {
+    let active = true
     if (user?.id) {
-      fetchProfile(user.id)
+      setProfileLoading(true)
+      fetchProfile(user.id).finally(() => {
+        if (active) setProfileLoading(false)
+      })
     } else {
       setProfile(null)
+      setProfileLoading(false)
+    }
+    return () => {
+      active = false
     }
   }, [user?.id, fetchProfile])
 
@@ -96,6 +108,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const value: AuthContextValue = {
     loading,
+    profileLoading,
     session,
     user,
     profile,

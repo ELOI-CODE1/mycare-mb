@@ -56,9 +56,11 @@ function RoleRouter() {
 }
 
 export default function RootNavigator() {
-  const { loading, session } = useAuth()
+  const { loading, profileLoading, session } = useAuth()
 
-  if (loading) return <Splash />
+  // Wait for the session check AND (when logged in) the profile/role fetch,
+  // so we never flash the "No role assigned" screen on startup.
+  if (loading || (session && profileLoading)) return <Splash />
 
   return (
     <Stack.Navigator screenOptions={{ headerShown: false }}>

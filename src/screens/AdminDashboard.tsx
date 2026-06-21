@@ -6,16 +6,8 @@ import AppHeader from '../components/AppHeader'
 import { Text, Card, Button, Input, Badge, Segmented, EmptyState } from '../components/ui'
 import { categoryEmoji } from '../components/ProductCard'
 import AdminOverview from '../components/admin/AdminOverview'
+import AdminUsers from '../components/admin/AdminUsers'
 import { colors, spacing, radius, roleColors } from '../theme'
-
-type User = {
-  id: string
-  email: string
-  full_name: string
-  role: string
-  phone: string
-  created_at: string
-}
 
 type Order = {
   id: number
@@ -46,7 +38,6 @@ const STATUSES = ['pending', 'confirmed', 'shipped', 'delivered', 'cancelled']
 
 export default function AdminDashboard() {
   const [activeTab, setActiveTab] = useState<'overview' | 'users' | 'orders' | 'products'>('overview')
-  const [users, setUsers] = useState<User[]>([])
   const [orders, setOrders] = useState<Order[]>([])
   const [products, setProducts] = useState<Product[]>([])
   const [showProductModal, setShowProductModal] = useState(false)
@@ -58,16 +49,9 @@ export default function AdminDashboard() {
   const [productVisibleTo, setProductVisibleTo] = useState('')
 
   useEffect(() => {
-    loadUsers()
     loadOrders()
     loadProducts()
   }, [])
-
-  const loadUsers = async () => {
-    const { data, error } = await supabase.from('profiles').select('*').order('created_at', { ascending: false })
-    if (error) console.error('Error loading users:', error)
-    else setUsers(data || [])
-  }
 
   const loadOrders = async () => {
     const { data: ordersData, error: ordersError } = await supabase
@@ -151,20 +135,6 @@ export default function AdminDashboard() {
     ])
   }
 
-  const deleteUser = (userId: string) => {
-    Alert.alert('Confirm', 'Delete this user?', [
-      { text: 'Cancel', style: 'cancel' },
-      {
-        text: 'Delete',
-        style: 'destructive',
-        onPress: async () => {
-          await supabase.from('profiles').delete().eq('id', userId)
-          loadUsers()
-        },
-      },
-    ])
-  }
-
   const openProductModal = (product?: Product) => {
     if (product) {
       setEditingProduct(product)
@@ -209,26 +179,7 @@ export default function AdminDashboard() {
         )}
 
         {/* USERS */}
-        {activeTab === 'users' && (
-          users.length === 0 ? (
-            <EmptyState icon="people-outline" title="No users found" />
-          ) : (
-            users.map(user => (
-              <Card key={user.id}>
-                <View style={styles.rowBetween}>
-                  <Text variant="label">{user.full_name || 'Unnamed'}</Text>
-                  <Badge label={user.role} bg={SOFT} fg={ACCENT} />
-                </View>
-                <Text variant="caption" muted style={{ marginTop: 2 }}>{user.email}</Text>
-                <Text variant="caption" muted>{user.phone || '—'}</Text>
-                <Text variant="caption" muted>Joined {new Date(user.created_at).toLocaleDateString()}</Text>
-                {user.role !== 'admin' && (
-                  <Button title="Delete User" variant="danger" onPress={() => deleteUser(user.id)} style={{ marginTop: spacing.md }} />
-                )}
-              </Card>
-            ))
-          )
-        )}
+        {activeTab === 'users' && <AdminUsers />}
 
         {/* ORDERS */}
         {activeTab === 'orders' && (
