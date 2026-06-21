@@ -1,7 +1,11 @@
 import React, { useState, useEffect } from 'react'
-import { View, Text, TouchableOpacity, StyleSheet, ScrollView, Alert, TextInput, Modal } from 'react-native'
+import { View, StyleSheet, ScrollView, Alert, Modal, TouchableOpacity } from 'react-native'
+import { Ionicons } from '@expo/vector-icons'
 import { supabase } from '../lib/supabase'
 import AppHeader from '../components/AppHeader'
+import { Text, Card, Button, Input, Badge, Segmented, EmptyState } from '../components/ui'
+import { categoryEmoji } from '../components/ProductCard'
+import { colors, spacing, radius, roleColors } from '../theme'
 
 type User = {
   id: string
@@ -35,6 +39,10 @@ type Product = {
   is_available: boolean
 }
 
+const ACCENT = roleColors.admin.accent
+const SOFT = roleColors.admin.soft
+const STATUSES = ['pending', 'confirmed', 'shipped', 'delivered', 'cancelled']
+
 export default function AdminDashboard() {
   const [activeTab, setActiveTab] = useState<'users' | 'orders' | 'products'>('users')
   const [users, setUsers] = useState<User[]>([])
@@ -55,107 +63,48 @@ export default function AdminDashboard() {
   }, [])
 
   const loadUsers = async () => {
-  const { data, error } = await supabase
-    .from('profiles')
-    .select('*')
-    .order('created_at', { ascending: false })
-  
-  if (error) {
-    console.error('Error loading users:', error)
-  } else {
-    setUsers(data || [])
+    const { data, error } = await supabase.from('profiles').select('*').order('created_at', { ascending: false })
+    if (error) console.error('Error loading users:', error)
+    else setUsers(data || [])
   }
-}
 
   const loadOrders = async () => {
-  // First get all orders
-  const { data: ordersData, error: ordersError } = await supabase
-    .from('orders')
-    .select('*')
-    .order('created_at', { ascending: false })
-  
-  if (ordersError) {
-    console.error('Error loading orders:', ordersError)
-    return
+    const { data: ordersData, error: ordersError } = await supabase
+      .from('orders')
+      .select('*')
+      .order('created_at', { ascending: false })
+
+    if (ordersError) { console.error('Error loading orders:', ordersError); return }
+    if (!ordersData || ordersData.length === 0) { setOrders([]); return }
+
+    const userIds = [...new Set(ordersData.map(o => o.user_id))]
+    const { data: profilesData } = await supabase.from('profiles').select('id, email').in('id', userIds)
+
+    const productIds = [...new Set(ordersData.map(o => o.product_id))]
+    const { data: productsData } = await supabase.from('products').select('id, name').in('id', productIds)
+
+    const profileMap = new Map<string, any>()
+    profilesData?.forEach(p => profileMap.set(p.id, p))
+    const productMap = new Map<number, any>()
+    productsData?.forEach(p => productMap.set(p.id, p))
+
+    setOrders(ordersData.map(o => ({
+      ...o,
+      profiles: profileMap.get(o.user_id) || { email: 'Unknown' },
+      products: productMap.get(o.product_id) || { name: 'Unknown' },
+    })))
   }
-  
-  if (!ordersData || ordersData.length === 0) {
-    setOrders([])
-    return
-  }
-  
-  // Get all unique user IDs from orders
-  const userIds = [...new Set(ordersData.map(order => order.user_id))]
-  
-  // Get profiles for these users
-  const { data: profilesData, error: profilesError } = await supabase
-    .from('profiles')
-    .select('id, email')
-    .in('id', userIds)
-  
-  if (profilesError) {
-    console.error('Error loading profiles:', profilesError)
-  }
-  
-  // Get all unique product IDs from orders
-  const productIds = [...new Set(ordersData.map(order => order.product_id))]
-  
-  // Get products for these orders
-  const { data: productsData, error: productsError } = await supabase
-    .from('products')
-    .select('id, name')
-    .in('id', productIds)
-  
-  if (productsError) {
-    console.error('Error loading products:', productsError)
-  }
-  
-  // Create maps for quick lookup
-  const profileMap = new Map()
-  profilesData?.forEach(profile => {
-    profileMap.set(profile.id, profile)
-  })
-  
-  const productMap = new Map()
-  productsData?.forEach(product => {
-    productMap.set(product.id, product)
-  })
-  
-  // Combine the data
-  const combinedOrders = ordersData.map(order => ({
-    ...order,
-    profiles: profileMap.get(order.user_id) || { email: 'Unknown' },
-    products: productMap.get(order.product_id) || { name: 'Unknown' }
-  }))
-  
-  setOrders(combinedOrders)
-}
 
   const loadProducts = async () => {
-    const { data, error } = await supabase
-      .from('products')
-      .select('*')
-      .order('id')
-    
-    if (error) {
-      console.error('Error loading products:', error)
-    } else {
-      setProducts(data || [])
-    }
+    const { data, error } = await supabase.from('products').select('*').order('id')
+    if (error) console.error('Error loading products:', error)
+    else setProducts(data || [])
   }
 
   const updateOrderStatus = async (orderId: number, newStatus: string) => {
-    const { error } = await supabase
-      .from('orders')
-      .update({ status: newStatus })
-      .eq('id', orderId)
-    
-    if (error) {
-      Alert.alert('Error', 'Failed to update order status')
-    } else {
-      Alert.alert('Success', 'Order status updated')
-      loadOrders()
-    }
+    const { error } = await supabase.from('orders').update({ status: newStatus }).eq('id', orderId)
+    if (error) Alert.alert('Error', 'Failed to update order status')
+    else loadOrders()
   }
 
   const saveProduct = async () => {
@@ -163,75 +112,45 @@ export default function AdminDashboard() {
       Alert.alert('Error', 'Please fill required fields')
       return
     }
-
-    const visibleToArray = productVisibleTo.split(',').map(s => s.trim())
+    const visibleToArray = productVisibleTo.split(',').map(s => s.trim()).filter(Boolean)
     const priceNum = parseInt(productPrice)
 
-    if (editingProduct) {
-      const { error } = await supabase
-        .from('products')
-        .update({
-          name: productName,
-          description: productDescription,
-          price: priceNum,
-          category: productCategory,
-          visible_to: visibleToArray
-        })
-        .eq('id', editingProduct.id)
-      
-      if (error) {
-        Alert.alert('Error', 'Failed to update product')
-      } else {
-        Alert.alert('Success', 'Product updated')
-        setShowProductModal(false)
-        loadProducts()
-      }
+    const payload = {
+      name: productName,
+      description: productDescription,
+      price: priceNum,
+      category: productCategory,
+      visible_to: visibleToArray,
+    }
+
+    const { error } = editingProduct
+      ? await supabase.from('products').update(payload).eq('id', editingProduct.id)
+      : await supabase.from('products').insert({ ...payload, is_available: true })
+
+    if (error) {
+      Alert.alert('Error', `Failed to ${editingProduct ? 'update' : 'create'} product`)
     } else {
-      const { error } = await supabase
-        .from('products')
-        .insert({
-          name: productName,
-          description: productDescription,
-          price: priceNum,
-          category: productCategory,
-          visible_to: visibleToArray,
-          is_available: true
-        })
-      
-      if (error) {
-        Alert.alert('Error', 'Failed to create product')
-      } else {
-        Alert.alert('Success', 'Product created')
-        setShowProductModal(false)
-        loadProducts()
-      }
+      setShowProductModal(false)
+      loadProducts()
     }
   }
 
-  const deleteProduct = async (productId: number) => {
+  const deleteProduct = (productId: number) => {
     Alert.alert('Confirm', 'Delete this product?', [
       { text: 'Cancel', style: 'cancel' },
       {
         text: 'Delete',
         style: 'destructive',
         onPress: async () => {
-          const { error } = await supabase
-            .from('products')
-            .delete()
-            .eq('id', productId)
-          
-          if (error) {
-            Alert.alert('Error', 'Failed to delete product')
-          } else {
-            Alert.alert('Success', 'Product deleted')
-            loadProducts()
-          }
-        }
-      }
+          const { error } = await supabase.from('products').delete().eq('id', productId)
+          if (error) Alert.alert('Error', 'Failed to delete product')
+          else loadProducts()
+        },
+      },
     ])
   }
 
-  const deleteUser = async (userId: string) => {
+  const deleteUser = (userId: string) => {
     Alert.alert('Confirm', 'Delete this user?', [
       { text: 'Cancel', style: 'cancel' },
       {
@@ -240,9 +159,8 @@ export default function AdminDashboard() {
         onPress: async () => {
           await supabase.from('profiles').delete().eq('id', userId)
           loadUsers()
-          Alert.alert('Success', 'User deleted')
-        }
-      }
+        },
+      },
     ])
   }
 
@@ -268,367 +186,165 @@ export default function AdminDashboard() {
   return (
     <View style={styles.root}>
       <AppHeader role="admin" />
-      <ScrollView style={styles.container}>
-      <View style={styles.tabBar}>
-        <TouchableOpacity 
-          style={[styles.tab, activeTab === 'users' && styles.activeTab]}
-          onPress={() => setActiveTab('users')}
-        >
-          <Text style={styles.tabText}>Users</Text>
-        </TouchableOpacity>
-        <TouchableOpacity 
-          style={[styles.tab, activeTab === 'orders' && styles.activeTab]}
-          onPress={() => setActiveTab('orders')}
-        >
-          <Text style={styles.tabText}>Orders</Text>
-        </TouchableOpacity>
-        <TouchableOpacity 
-          style={[styles.tab, activeTab === 'products' && styles.activeTab]}
-          onPress={() => setActiveTab('products')}
-        >
-          <Text style={styles.tabText}>Products</Text>
-        </TouchableOpacity>
-      </View>
+      <ScrollView style={styles.container} contentContainerStyle={styles.content}>
+        <Text variant="title">Admin Dashboard</Text>
+        <Text muted style={{ marginBottom: spacing.lg }}>Manage users, orders and products.</Text>
 
-      {activeTab === 'users' && (
-        <View>
-          <Text style={styles.sectionTitle}>Registered Users</Text>
-          {users.length === 0 ? (
-            <Text style={styles.emptyText}>No users found</Text>
+        <Segmented
+          accent={ACCENT}
+          value={activeTab}
+          onChange={(k) => setActiveTab(k as any)}
+          tabs={[{ key: 'users', label: 'Users' }, { key: 'orders', label: 'Orders' }, { key: 'products', label: 'Products' }]}
+        />
+
+        {/* USERS */}
+        {activeTab === 'users' && (
+          users.length === 0 ? (
+            <EmptyState icon="people-outline" title="No users found" />
           ) : (
-            users.map((user) => (
-              <View key={user.id} style={styles.card}>
-                <Text style={styles.cardTitle}>{user.full_name}</Text>
-                <Text>Email: {user.email}</Text>
-                <Text>Role: {user.role}</Text>
-                <Text>Phone: {user.phone}</Text>
-                <Text style={styles.cardDate}>
-                  Joined: {new Date(user.created_at).toLocaleDateString()}
-                </Text>
+            users.map(user => (
+              <Card key={user.id}>
+                <View style={styles.rowBetween}>
+                  <Text variant="label">{user.full_name || 'Unnamed'}</Text>
+                  <Badge label={user.role} bg={SOFT} fg={ACCENT} />
+                </View>
+                <Text variant="caption" muted style={{ marginTop: 2 }}>{user.email}</Text>
+                <Text variant="caption" muted>{user.phone || '—'}</Text>
+                <Text variant="caption" muted>Joined {new Date(user.created_at).toLocaleDateString()}</Text>
                 {user.role !== 'admin' && (
-                  <TouchableOpacity 
-                    style={styles.deleteButton}
-                    onPress={() => deleteUser(user.id)}
-                  >
-                    <Text style={styles.deleteButtonText}>Delete User</Text>
-                  </TouchableOpacity>
+                  <Button title="Delete User" variant="danger" onPress={() => deleteUser(user.id)} style={{ marginTop: spacing.md }} />
                 )}
-              </View>
+              </Card>
             ))
-          )}
-        </View>
-      )}
+          )
+        )}
 
-      {activeTab === 'orders' && (
-        <View>
-          <Text style={styles.sectionTitle}>All Orders</Text>
-          {orders.length === 0 ? (
-            <Text style={styles.emptyText}>No orders found</Text>
+        {/* ORDERS */}
+        {activeTab === 'orders' && (
+          orders.length === 0 ? (
+            <EmptyState icon="receipt-outline" title="No orders found" />
           ) : (
-            orders.map((order) => (
-              <View key={order.id} style={styles.card}>
-                <Text style={styles.cardTitle}>Order #{order.id}</Text>
-                <Text>Customer: {order.profiles?.email || 'Unknown'}</Text>
-                <Text>Product: {order.products?.name || 'Unknown'}</Text>
-                <Text>Quantity: {order.quantity}</Text>
-                <Text>Total: {order.total_price.toLocaleString()} RWF</Text>
-                <Text>Address: {order.delivery_address}</Text>
-                <Text>Status: {order.status}</Text>
-                <View style={styles.statusButtons}>
-                  {['pending', 'confirmed', 'shipped', 'delivered', 'cancelled'].map((status) => (
-                    <TouchableOpacity
-                      key={status}
-                      style={[styles.statusButton, order.status === status && styles.activeStatusButton]}
-                      onPress={() => updateOrderStatus(order.id, status)}
-                    >
-                      <Text style={styles.statusButtonText}>{status}</Text>
-                    </TouchableOpacity>
-                  ))}
+            orders.map(order => (
+              <Card key={order.id}>
+                <View style={styles.rowBetween}>
+                  <Text variant="label">Order #{order.id}</Text>
+                  <Badge label={order.status} status={order.status} />
                 </View>
-              </View>
+                <View style={{ marginTop: spacing.sm, gap: 2 }}>
+                  <Text variant="caption" muted>Customer: {order.profiles?.email || 'Unknown'}</Text>
+                  <Text variant="caption" muted>Product: {order.products?.name || 'Unknown'} × {order.quantity}</Text>
+                  <Text variant="caption" muted>Total: {order.total_price.toLocaleString()} RWF</Text>
+                  <Text variant="caption" muted>Address: {order.delivery_address || '—'}</Text>
+                </View>
+                <Text variant="caption" muted style={{ marginTop: spacing.md, marginBottom: spacing.xs }}>Update status</Text>
+                <View style={styles.statusRow}>
+                  {STATUSES.map(status => {
+                    const active = order.status === status
+                    return (
+                      <TouchableOpacity
+                        key={status}
+                        onPress={() => updateOrderStatus(order.id, status)}
+                        style={[styles.statusChip, active && { backgroundColor: ACCENT, borderColor: ACCENT }]}
+                      >
+                        <Text variant="caption" color={active ? colors.white : colors.gray700} style={{ textTransform: 'capitalize' }}>
+                          {status}
+                        </Text>
+                      </TouchableOpacity>
+                    )
+                  })}
+                </View>
+              </Card>
             ))
-          )}
-        </View>
-      )}
+          )
+        )}
 
-      {activeTab === 'products' && (
-        <View>
-          <View style={styles.addButtonRow}>
-            <Text style={styles.sectionTitle}>Products</Text>
-            <TouchableOpacity 
-              style={styles.addButton}
+        {/* PRODUCTS */}
+        {activeTab === 'products' && (
+          <View>
+            <Button
+              title="+ Add Product"
+              accent={ACCENT}
               onPress={() => openProductModal()}
-            >
-              <Text style={styles.addButtonText}>+ Add Product</Text>
-            </TouchableOpacity>
+              style={{ marginBottom: spacing.lg }}
+            />
+            {products.length === 0 ? (
+              <EmptyState icon="cube-outline" title="No products found" />
+            ) : (
+              products.map(product => (
+                <Card key={product.id} style={styles.productCard}>
+                  <View style={[styles.thumb, { backgroundColor: SOFT }]}>
+                    <Text style={{ fontSize: 24 }}>{categoryEmoji(product.category)}</Text>
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <Text variant="label">{product.name}</Text>
+                    <Text variant="caption" muted numberOfLines={1}>{product.description}</Text>
+                    <Text variant="label" color={ACCENT} style={{ marginTop: 2 }}>{product.price.toLocaleString()} RWF</Text>
+                    <Text variant="caption" muted>Visible to: {product.visible_to?.join(', ') || '—'}</Text>
+                    <View style={styles.productActions}>
+                      <TouchableOpacity style={[styles.smallBtn, { backgroundColor: colors.blueSoft }]} onPress={() => openProductModal(product)}>
+                        <Ionicons name="create-outline" size={16} color={colors.blue} />
+                        <Text variant="caption" color={colors.blue}>Edit</Text>
+                      </TouchableOpacity>
+                      <TouchableOpacity style={[styles.smallBtn, { backgroundColor: colors.redSoft }]} onPress={() => deleteProduct(product.id)}>
+                        <Ionicons name="trash-outline" size={16} color={colors.danger} />
+                        <Text variant="caption" color={colors.danger}>Delete</Text>
+                      </TouchableOpacity>
+                    </View>
+                  </View>
+                </Card>
+              ))
+            )}
           </View>
-          
-          {products.length === 0 ? (
-            <Text style={styles.emptyText}>No products found</Text>
-          ) : (
-            products.map((product) => (
-              <View key={product.id} style={styles.card}>
-                <Text style={styles.cardTitle}>{product.name}</Text>
-                <Text>{product.description}</Text>
-                <Text>Price: {product.price.toLocaleString()} RWF</Text>
-                <Text>Category: {product.category}</Text>
-                <Text>Visible to: {product.visible_to?.join(', ')}</Text>
-                <View style={styles.productButtons}>
-                  <TouchableOpacity 
-                    style={styles.editButton}
-                    onPress={() => openProductModal(product)}
-                  >
-                    <Text style={styles.editButtonText}>Edit</Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity 
-                    style={styles.deleteButtonSmall}
-                    onPress={() => deleteProduct(product.id)}
-                  >
-                    <Text style={styles.deleteButtonTextSmall}>Delete</Text>
-                  </TouchableOpacity>
-                </View>
-              </View>
-            ))
-          )}
-        </View>
-      )}
+        )}
+      </ScrollView>
 
-      <Modal visible={showProductModal} animationType="slide" transparent>
-        <View style={styles.modalContainer}>
+      {/* Product add/edit modal */}
+      <Modal visible={showProductModal} animationType="slide" transparent onRequestClose={() => setShowProductModal(false)}>
+        <View style={styles.modalOverlay}>
           <View style={styles.modalContent}>
-            <Text style={styles.modalTitle}>
+            <Text variant="heading" center style={{ marginBottom: spacing.lg }}>
               {editingProduct ? 'Edit Product' : 'Add Product'}
             </Text>
-            
-            <TextInput
-              style={styles.input}
-              placeholder="Product Name"
-              value={productName}
-              onChangeText={setProductName}
-            />
-            <TextInput
-              style={styles.input}
-              placeholder="Description"
-              value={productDescription}
-              onChangeText={setProductDescription}
-              multiline
-            />
-            <TextInput
-              style={styles.input}
-              placeholder="Price (RWF)"
-              value={productPrice}
-              onChangeText={setProductPrice}
-              keyboardType="numeric"
-            />
-            <TextInput
-              style={styles.input}
-              placeholder="Category (pads, condoms, pain, hygiene, test)"
-              value={productCategory}
-              onChangeText={setProductCategory}
-            />
-            <TextInput
-              style={styles.input}
-              placeholder="Visible to (girl, boy, parent) - comma separated"
-              value={productVisibleTo}
-              onChangeText={setProductVisibleTo}
-            />
-            
-            <TouchableOpacity style={styles.saveButton} onPress={saveProduct}>
-              <Text style={styles.saveButtonText}>Save</Text>
-            </TouchableOpacity>
-            <TouchableOpacity style={styles.cancelButton} onPress={() => setShowProductModal(false)}>
-              <Text style={styles.cancelButtonText}>Cancel</Text>
-            </TouchableOpacity>
+            <ScrollView>
+              <Input label="Name" placeholder="Product name" value={productName} onChangeText={setProductName} />
+              <Input label="Description" placeholder="Short description" value={productDescription} onChangeText={setProductDescription} multiline />
+              <Input label="Price (RWF)" placeholder="2500" value={productPrice} onChangeText={setProductPrice} keyboardType="numeric" />
+              <Input label="Category" placeholder="pads, condoms, pain, hygiene, test" value={productCategory} onChangeText={setProductCategory} />
+              <Input label="Visible to" placeholder="girl, boy, parent" value={productVisibleTo} onChangeText={setProductVisibleTo} />
+              <Button title="Save" accent={ACCENT} onPress={saveProduct} />
+              <Button title="Cancel" variant="secondary" onPress={() => setShowProductModal(false)} style={{ marginTop: spacing.sm }} />
+            </ScrollView>
           </View>
         </View>
       </Modal>
-      </ScrollView>
     </View>
   )
 }
 
 const styles = StyleSheet.create({
-  root: {
-    flex: 1,
-    backgroundColor: '#f5f5f5'
-  },
-  container: {
-    flex: 1,
-    backgroundColor: '#f5f5f5',
-    padding: 16
-  },
-  tabBar: {
-    flexDirection: 'row',
-    marginBottom: 20,
-    backgroundColor: '#fff',
-    borderRadius: 10,
-    overflow: 'hidden'
-  },
-  tab: {
-    flex: 1,
-    paddingVertical: 12,
-    alignItems: 'center'
-  },
-  activeTab: {
-    backgroundColor: '#f44336'
-  },
-  tabText: {
-    fontSize: 14,
-    fontWeight: '500',
-    color: '#333'
-  },
-  sectionTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    marginBottom: 15
-  },
-  addButtonRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 15
-  },
-  addButton: {
-    backgroundColor: '#4caf50',
-    paddingHorizontal: 15,
-    paddingVertical: 8,
-    borderRadius: 8
-  },
-  addButtonText: {
-    color: '#fff',
-    fontWeight: '600'
-  },
-  card: {
-    backgroundColor: '#fff',
-    borderRadius: 10,
-    padding: 15,
-    marginBottom: 10,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.1,
-    shadowRadius: 2,
-    elevation: 2
-  },
-  cardTitle: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    marginBottom: 8
-  },
-  cardDate: {
-    fontSize: 10,
-    color: '#999',
-    marginTop: 8
-  },
-  statusButtons: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    marginTop: 10,
-    gap: 8
-  },
-  statusButton: {
-    backgroundColor: '#e0e0e0',
-    paddingHorizontal: 12,
+  root: { flex: 1, backgroundColor: colors.background },
+  container: { flex: 1 },
+  content: { padding: spacing.lg, paddingBottom: spacing.xxl },
+  rowBetween: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  statusRow: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
+  statusChip: {
+    paddingHorizontal: spacing.md,
     paddingVertical: 6,
-    borderRadius: 5,
-    marginRight: 8,
-    marginBottom: 5
-  },
-  activeStatusButton: {
-    backgroundColor: '#4caf50'
-  },
-  statusButtonText: {
-    fontSize: 12,
-    color: '#333'
-  },
-  productButtons: {
-    flexDirection: 'row',
-    marginTop: 10,
-    gap: 10
-  },
-  editButton: {
-    backgroundColor: '#2196f3',
-    paddingHorizontal: 15,
-    paddingVertical: 8,
-    borderRadius: 5
-  },
-  editButtonText: {
-    color: '#fff',
-    fontWeight: '600'
-  },
-  deleteButton: {
-    backgroundColor: '#f44336',
-    paddingHorizontal: 15,
-    paddingVertical: 8,
-    borderRadius: 5,
-    marginTop: 10,
-    alignItems: 'center'
-  },
-  deleteButtonText: {
-    color: '#fff',
-    fontWeight: '600'
-  },
-  deleteButtonSmall: {
-    backgroundColor: '#f44336',
-    paddingHorizontal: 15,
-    paddingVertical: 8,
-    borderRadius: 5
-  },
-  deleteButtonTextSmall: {
-    color: '#fff',
-    fontWeight: '600'
-  },
-  emptyText: {
-    textAlign: 'center',
-    color: '#999',
-    padding: 20
-  },
-  modalContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: 'rgba(0,0,0,0.5)'
-  },
-  modalContent: {
-    backgroundColor: '#fff',
-    borderRadius: 15,
-    padding: 20,
-    width: '90%',
-    maxHeight: '80%'
-  },
-  modalTitle: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    marginBottom: 15,
-    textAlign: 'center'
-  },
-  input: {
-    backgroundColor: '#f5f5f5',
+    borderRadius: radius.pill,
     borderWidth: 1,
-    borderColor: '#ddd',
-    borderRadius: 8,
-    padding: 12,
-    marginBottom: 10,
-    fontSize: 14
+    borderColor: colors.border,
   },
-  saveButton: {
-    backgroundColor: '#4caf50',
-    padding: 12,
-    borderRadius: 8,
+  productCard: { flexDirection: 'row', gap: spacing.md },
+  thumb: { width: 48, height: 48, borderRadius: radius.md, alignItems: 'center', justifyContent: 'center' },
+  productActions: { flexDirection: 'row', gap: spacing.sm, marginTop: spacing.sm },
+  smallBtn: {
+    flexDirection: 'row',
     alignItems: 'center',
-    marginTop: 10
+    gap: 4,
+    paddingHorizontal: spacing.md,
+    paddingVertical: 6,
+    borderRadius: radius.sm,
   },
-  saveButtonText: {
-    color: '#fff',
-    fontWeight: '600'
-  },
-  cancelButton: {
-    backgroundColor: '#f5f5f5',
-    padding: 12,
-    borderRadius: 8,
-    alignItems: 'center',
-    marginTop: 10
-  },
-  cancelButtonText: {
-    color: '#666'
-  }
+  modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', padding: spacing.lg },
+  modalContent: { backgroundColor: colors.surface, borderRadius: radius.lg, padding: spacing.xl, maxHeight: '85%' },
 })

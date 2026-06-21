@@ -1,21 +1,32 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, ScrollView, Alert } from 'react-native';
+import { View, StyleSheet, ScrollView } from 'react-native';
 import { supabase } from '../lib/supabase';
 import AddToCartModal from '../components/AddToCartModal';
 import AppHeader from '../components/AppHeader';
+import ProductCard from '../components/ProductCard';
+import OrderCard from '../components/OrderCard';
+import { Text, Segmented, EmptyState } from '../components/ui';
 import { useCart } from '../context/CartContext';
+import { useAuth } from '../context/AuthContext';
+import { colors, spacing, roleColors } from '../theme';
 
 type Product = { id: number; name: string; description: string; price: number; category: string; };
 type Order = { id: number; product_id: number; product_name: string; quantity: number; total_price: number; status: string; created_at: string; };
 
+const ACCENT = roleColors.boy.accent;
+const SOFT = roleColors.boy.soft;
+
 export default function BoyDashboard() {
   const { checkoutCount } = useCart();
+  const { profile } = useAuth();
   const [userId, setUserId] = useState<string | null>(null);
   const [products, setProducts] = useState<Product[]>([]);
   const [orders, setOrders] = useState<Order[]>([]);
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
   const [isModalVisible, setIsModalVisible] = useState(false);
   const [activeTab, setActiveTab] = useState<'shop' | 'orders'>('shop');
+
+  const firstName = profile?.full_name?.split(' ')[0] || 'there';
 
   useEffect(() => {
     init();
@@ -41,63 +52,74 @@ export default function BoyDashboard() {
 
   const loadOrders = async (uid: string) => {
     const { data } = await supabase.from('orders').select('*, products(name)').eq('user_id', uid).order('created_at', { ascending: false });
-    if (data) setOrders(data.map(o => ({ ...o, product_name: o.products?.name || 'Unknown' })));
+    if (data) setOrders(data.map((o: any) => ({ ...o, product_name: o.products?.name || 'Unknown' })));
   };
+
+  const openProduct = (p: Product) => { setSelectedProduct(p); setIsModalVisible(true); };
 
   return (
     <View style={styles.root}>
       <AppHeader role="boy" />
-      <ScrollView style={styles.container}>
-      <View style={styles.tabBar}>
-        {(['shop', 'orders'] as const).map(tab => (
-          <TouchableOpacity key={tab} style={[styles.tab, activeTab === tab && styles.activeTab]} onPress={() => setActiveTab(tab)}>
-            <Text style={styles.tabText}>{tab.toUpperCase()}</Text>
-          </TouchableOpacity>
-        ))}
-      </View>
+      <ScrollView style={styles.container} contentContainerStyle={styles.content}>
+        <Text variant="title">Hello, {firstName}</Text>
+        <Text muted style={{ marginBottom: spacing.lg }}>Your health, handled discreetly.</Text>
 
-      {activeTab === 'shop' && products.map(p => (
-        <View key={p.id} style={styles.productCard}>
-          <View style={{flex: 1}}>
-            <Text style={styles.productName}>{p.name}</Text>
-            <Text style={styles.productPrice}>{p.price.toLocaleString()} RWF</Text>
-          </View>
-          <TouchableOpacity style={styles.orderButton} onPress={() => { setSelectedProduct(p); setIsModalVisible(true); }}>
-            <Text style={styles.orderButtonText}>Order</Text>
-          </TouchableOpacity>
-        </View>
-      ))}
+        <Segmented
+          accent={ACCENT}
+          value={activeTab}
+          onChange={(k) => setActiveTab(k as any)}
+          tabs={[{ key: 'shop', label: 'Shop' }, { key: 'orders', label: 'Orders' }]}
+        />
 
-      {activeTab === 'orders' && orders.map(o => (
-        <View key={o.id} style={styles.orderCard}>
-          <Text style={styles.orderProduct}>{o.product_name}</Text>
-          <Text>Status: {o.status}</Text>
-        </View>
-      ))}
+        {activeTab === 'shop' && (
+          products.length === 0 ? (
+            <EmptyState icon="bag-handle-outline" title="No products yet" subtitle="Check back soon." />
+          ) : (
+            products.map(p => (
+              <ProductCard
+                key={p.id}
+                name={p.name}
+                price={p.price}
+                description={p.description}
+                category={p.category}
+                accent={ACCENT}
+                soft={SOFT}
+                onAdd={() => openProduct(p)}
+              />
+            ))
+          )
+        )}
 
-      <AddToCartModal
-        visible={isModalVisible}
-        onClose={() => setIsModalVisible(false)}
-        product={selectedProduct}
-        accent="#2196f3"
-      />
+        {activeTab === 'orders' && (
+          orders.length === 0 ? (
+            <EmptyState icon="receipt-outline" title="No orders yet" subtitle="Your orders will appear here." />
+          ) : (
+            orders.map(o => (
+              <OrderCard
+                key={o.id}
+                productName={o.product_name}
+                quantity={o.quantity}
+                total={o.total_price}
+                status={o.status}
+                date={o.created_at}
+              />
+            ))
+          )
+        )}
+
+        <AddToCartModal
+          visible={isModalVisible}
+          onClose={() => setIsModalVisible(false)}
+          product={selectedProduct}
+          accent={ACCENT}
+        />
       </ScrollView>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: '#f5f5f5' },
-  container: { flex: 1, padding: 20, backgroundColor: '#f5f5f5' },
-  tabBar: { flexDirection: 'row', marginBottom: 20 },
-  tab: { flex: 1, padding: 10, alignItems: 'center', backgroundColor: '#ddd' },
-  activeTab: { backgroundColor: '#2196f3' },
-  tabText: { color: '#fff' },
-  productCard: { backgroundColor: '#fff', padding: 15, borderRadius: 10, marginBottom: 10, flexDirection: 'row', justifyContent: 'space-between' },
-  productName: { fontWeight: 'bold' },
-  productPrice: { color: '#2196f3' },
-  orderButton: { backgroundColor: '#2196f3', padding: 10, borderRadius: 8 },
-  orderButtonText: { color: '#fff' },
-  orderCard: { backgroundColor: '#fff', padding: 15, borderRadius: 10, marginBottom: 10 },
-  orderProduct: { fontWeight: 'bold' }
+  root: { flex: 1, backgroundColor: colors.background },
+  container: { flex: 1 },
+  content: { padding: spacing.lg, paddingBottom: spacing.xxl },
 });

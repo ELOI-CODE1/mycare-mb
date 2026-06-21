@@ -1,20 +1,32 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, ScrollView, Alert } from 'react-native';
+import { View, StyleSheet, ScrollView } from 'react-native';
 import { supabase } from '../lib/supabase';
 import AddToCartModal from '../components/AddToCartModal';
 import AppHeader from '../components/AppHeader';
+import ProductCard from '../components/ProductCard';
+import OrderCard from '../components/OrderCard';
+import { Text, Segmented, EmptyState } from '../components/ui';
 import { useCart } from '../context/CartContext';
+import { useAuth } from '../context/AuthContext';
+import { colors, spacing, roleColors } from '../theme';
+
+type Product = { id: number; name: string; description: string; price: number; category: string; };
+type Order = { id: number; product_name: string; quantity: number; total_price: number; status: string; created_at: string; };
+
+const ACCENT = roleColors.parent.accent;
+const SOFT = roleColors.parent.soft;
 
 export default function ParentDashboard() {
   const { checkoutCount } = useCart();
+  const { profile } = useAuth();
   const [userId, setUserId] = useState<string | null>(null);
-  const [products, setProducts] = useState<any[]>([]);
-  const [orders, setOrders] = useState<any[]>([]);
-  
-  // Modal State
-  const [selectedProduct, setSelectedProduct] = useState<any | null>(null);
+  const [products, setProducts] = useState<Product[]>([]);
+  const [orders, setOrders] = useState<Order[]>([]);
+  const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
   const [isOrderModalVisible, setIsOrderModalVisible] = useState(false);
-  const [activeTab, setActiveTab] = useState<'children' | 'shop' | 'orders'>('shop');
+  const [activeTab, setActiveTab] = useState<'shop' | 'orders'>('shop');
+
+  const firstName = profile?.full_name?.split(' ')[0] || 'there';
 
   useEffect(() => {
     init();
@@ -40,54 +52,79 @@ export default function ParentDashboard() {
   };
 
   const loadOrders = async (uid: string) => {
-    const { data } = await supabase.from('orders').select('*').eq('user_id', uid);
-    if (data) setOrders(data);
+    const { data } = await supabase
+      .from('orders')
+      .select('*, products(name)')
+      .eq('user_id', uid)
+      .order('created_at', { ascending: false });
+    if (data) setOrders(data.map((o: any) => ({ ...o, product_name: o.products?.name || 'Unknown' })));
   };
 
-  // This function is the bridge that MUST be called
-  const openOrderModal = (product: any) => {
-    setSelectedProduct(product);
-    setIsOrderModalVisible(true);
-  };
+  const openProduct = (p: Product) => { setSelectedProduct(p); setIsOrderModalVisible(true); };
 
   return (
     <View style={styles.root}>
       <AppHeader role="parent" />
-      <ScrollView style={styles.container}>
-      {/* Shop List */}
-      {products.map((product) => (
-        <View key={product.id} style={styles.card}>
-          <View>
-            <Text style={styles.name}>{product.name}</Text>
-            <Text style={styles.price}>{product.price.toLocaleString()} RWF</Text>
-          </View>
-          <TouchableOpacity 
-            style={styles.orderButton} 
-            onPress={() => openOrderModal(product)} // CALLING THE BRIDGE
-          >
-            <Text style={styles.btnText}>Order</Text>
-          </TouchableOpacity>
-        </View>
-      ))}
+      <ScrollView style={styles.container} contentContainerStyle={styles.content}>
+        <Text variant="title">Hello, {firstName} </Text>
+        <Text muted style={{ marginBottom: spacing.lg }}>Care essentials for your whole family.</Text>
 
-      {/* MODAL IS PLACED HERE */}
-      <AddToCartModal
-        visible={isOrderModalVisible}
-        onClose={() => setIsOrderModalVisible(false)}
-        product={selectedProduct}
-        accent="#4caf50"
-      />
+        <Segmented
+          accent={ACCENT}
+          value={activeTab}
+          onChange={(k) => setActiveTab(k as any)}
+          tabs={[{ key: 'shop', label: 'Shop' }, { key: 'orders', label: 'Orders' }]}
+        />
+
+        {activeTab === 'shop' && (
+          products.length === 0 ? (
+            <EmptyState icon="bag-handle-outline" title="No products yet" subtitle="Check back soon." />
+          ) : (
+            products.map(p => (
+              <ProductCard
+                key={p.id}
+                name={p.name}
+                price={p.price}
+                description={p.description}
+                category={p.category}
+                accent={ACCENT}
+                soft={SOFT}
+                onAdd={() => openProduct(p)}
+              />
+            ))
+          )
+        )}
+
+        {activeTab === 'orders' && (
+          orders.length === 0 ? (
+            <EmptyState icon="receipt-outline" title="No orders yet" subtitle="Your orders will appear here." />
+          ) : (
+            orders.map(o => (
+              <OrderCard
+                key={(o as any).id}
+                productName={o.product_name}
+                quantity={o.quantity}
+                total={o.total_price}
+                status={o.status}
+                date={o.created_at}
+              />
+            ))
+          )
+        )}
+
+        <AddToCartModal
+          visible={isOrderModalVisible}
+          onClose={() => setIsOrderModalVisible(false)}
+          product={selectedProduct}
+          accent={ACCENT}
+        />
       </ScrollView>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: '#f5f5f5' },
-  container: { flex: 1, padding: 20, backgroundColor: '#f5f5f5' },
-  card: { backgroundColor: '#fff', padding: 15, borderRadius: 10, marginBottom: 10, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  name: { fontWeight: 'bold', fontSize: 16 },
-  price: { color: '#4caf50', marginTop: 5 },
-  orderButton: { backgroundColor: '#4caf50', padding: 10, borderRadius: 8 },
-  btnText: { color: '#fff', fontWeight: 'bold' }
+  root: { flex: 1, backgroundColor: colors.background },
+  container: { flex: 1 },
+  content: { padding: spacing.lg, paddingBottom: spacing.xxl },
 });

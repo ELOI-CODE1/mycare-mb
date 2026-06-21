@@ -1,33 +1,41 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, ScrollView, Alert, Modal, TextInput } from 'react-native';
-import { Calendar, DateData } from 'react-native-calendars';
+import { View, StyleSheet, ScrollView, Alert } from 'react-native';
+import { Calendar } from 'react-native-calendars';
 import { format, parseISO, differenceInDays, addDays } from 'date-fns';
 import { supabase } from '../lib/supabase';
-import { loadPeriodDates, savePeriodDates, addPeriodDate, removePeriodDate } from '../utils/periodStorage';
+import { loadPeriodDates, addPeriodDate, removePeriodDate } from '../utils/periodStorage';
 import AddToCartModal from '../components/AddToCartModal';
 import AppHeader from '../components/AppHeader';
+import ProductCard from '../components/ProductCard';
+import OrderCard from '../components/OrderCard';
+import { Text, Card, Button, Segmented, EmptyState } from '../components/ui';
 import { useCart } from '../context/CartContext';
+import { useAuth } from '../context/AuthContext';
+import { colors, spacing, roleColors } from '../theme';
 
 type Product = { id: number; name: string; description: string; price: number; category: string; };
 type Order = { id: number; product_id: number; product_name: string; quantity: number; total_price: number; status: string; created_at: string; };
 
+const ACCENT = roleColors.girl.accent;
+const SOFT = roleColors.girl.soft;
+
 export default function GirlDashboard() {
   const { checkoutCount } = useCart();
+  const { profile } = useAuth();
   const [userId, setUserId] = useState<string | null>(null);
   const [periodDates, setPeriodDates] = useState<string[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
   const [orders, setOrders] = useState<Order[]>([]);
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
   const [isModalVisible, setIsModalVisible] = useState(false);
-  const [activeTab, setActiveTab] = useState<'shop' | 'calendar' | 'orders'>('shop');
+  const [activeTab, setActiveTab] = useState<'shop' | 'cycle' | 'orders'>('shop');
   const [markedDates, setMarkedDates] = useState({});
-  const [showEditModal, setShowEditModal] = useState(false);
-  const [editDate, setEditDate] = useState('');
-  const [newDate, setNewDate] = useState('');
   const [nextPeriodDate, setNextPeriodDate] = useState<string | null>(null);
   const [daysUntilNextPeriod, setDaysUntilNextPeriod] = useState<number | null>(null);
-  const [cyclePhase, setCyclePhase] = useState<string>('');
-  const [predictionMessage, setPredictionMessage] = useState<string>('');
+  const [cyclePhase, setCyclePhase] = useState<string>('Log your first period');
+  const [predictionMessage, setPredictionMessage] = useState<string>('Log 2 periods to see predictions');
+
+  const firstName = profile?.full_name?.split(' ')[0] || 'there';
 
   useEffect(() => {
     init();
@@ -63,12 +71,14 @@ export default function GirlDashboard() {
 
   const loadOrders = async (uid: string) => {
     const { data } = await supabase.from('orders').select('*, products(name)').eq('user_id', uid).order('created_at', { ascending: false });
-    if (data) setOrders(data.map(o => ({ ...o, product_name: o.products?.name || 'Unknown' })));
+    if (data) setOrders(data.map((o: any) => ({ ...o, product_name: o.products?.name || 'Unknown' })));
   };
 
   const calculatePrediction = (dates: string[]) => {
     if (dates.length < 2) {
       setPredictionMessage('Log 2 periods to see predictions');
+      setDaysUntilNextPeriod(null);
+      setNextPeriodDate(null);
       return;
     }
     const avgCycle = 28;
@@ -77,7 +87,7 @@ export default function GirlDashboard() {
     const daysUntil = differenceInDays(nextPeriod, new Date());
     setDaysUntilNextPeriod(daysUntil);
     setNextPeriodDate(format(nextPeriod, 'yyyy-MM-dd'));
-    setPredictionMessage(daysUntil <= 0 ? 'Period late. Update log.' : `Next period in ${daysUntil} days.`);
+    setPredictionMessage(daysUntil <= 0 ? 'Your period is late — update your log.' : `Next period in ${daysUntil} days.`);
   };
 
   const updateCyclePhase = (dates: string[]) => {
@@ -91,7 +101,7 @@ export default function GirlDashboard() {
 
   const updateCalendarMarks = (dates: string[]) => {
     const marks: any = {};
-    dates.forEach(d => marks[d] = { selected: true, selectedColor: '#e91e63' });
+    dates.forEach(d => marks[d] = { selected: true, selectedColor: ACCENT });
     setMarkedDates(marks);
   };
 
@@ -99,72 +109,139 @@ export default function GirlDashboard() {
     const newDates = await addPeriodDate(format(new Date(), 'yyyy-MM-dd'));
     setPeriodDates(newDates);
     loadData();
-    Alert.alert('Success', 'Period logged!');
+    Alert.alert('Logged', 'Today has been added to your period log.');
   };
 
-  const handleEditDate = async () => {
-    const updated = periodDates.map(d => d === editDate ? newDate : d).sort().reverse();
-    await savePeriodDates(updated);
-    setPeriodDates(updated);
-    loadData();
-    setShowEditModal(false);
+  const handleDayPress = (d: { dateString: string }) => {
+    const date = d.dateString;
+    if (periodDates.includes(date)) {
+      Alert.alert('Period date', `Remove ${date} from your log?`, [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Remove',
+          style: 'destructive',
+          onPress: async () => { const nd = await removePeriodDate(date); setPeriodDates(nd); loadData(); },
+        },
+      ]);
+    } else {
+      Alert.alert('Log period', `Log a period on ${date}?`, [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Log',
+          onPress: async () => { const nd = await addPeriodDate(date); setPeriodDates(nd); loadData(); },
+        },
+      ]);
+    }
   };
+
+  const openProduct = (p: Product) => { setSelectedProduct(p); setIsModalVisible(true); };
 
   return (
     <View style={styles.root}>
       <AppHeader role="girl" />
-      <ScrollView style={styles.container}>
-      <View style={styles.tabBar}>
-        {(['shop', 'calendar', 'orders'] as const).map(tab => (
-          <TouchableOpacity key={tab} style={[styles.tab, activeTab === tab && styles.activeTab]} onPress={() => setActiveTab(tab)}>
-            <Text style={styles.tabText}>{tab.toUpperCase()}</Text>
-          </TouchableOpacity>
-        ))}
-      </View>
+      <ScrollView style={styles.container} contentContainerStyle={styles.content}>
+        <Text variant="title">Hello, {firstName} </Text>
+        <Text muted style={{ marginBottom: spacing.lg }}>Take care of yourself today.</Text>
 
-      {activeTab === 'shop' && products.map(p => (
-        <View key={p.id} style={styles.card}>
-          <View><Text style={styles.name}>{p.name}</Text><Text>{p.price} RWF</Text></View>
-          <TouchableOpacity style={styles.orderButton} onPress={() => { setSelectedProduct(p); setIsModalVisible(true); }}>
-            <Text style={styles.btnText}>Order</Text>
-          </TouchableOpacity>
-        </View>
-      ))}
+        <Segmented
+          accent={ACCENT}
+          value={activeTab}
+          onChange={(k) => setActiveTab(k as any)}
+          tabs={[{ key: 'shop', label: 'Shop' }, { key: 'cycle', label: 'Cycle' }, { key: 'orders', label: 'Orders' }]}
+        />
 
-      {activeTab === 'calendar' && (
-        <View>
-          <Text style={styles.phase}>{cyclePhase}</Text>
-          <TouchableOpacity style={styles.logButton} onPress={handleLogPeriod}><Text style={styles.btnText}>Log Period</Text></TouchableOpacity>
-          <Calendar markedDates={markedDates} onDayPress={(d) => { setEditDate(d.dateString); setShowEditModal(true); }} />
-        </View>
-      )}
+        {activeTab === 'shop' && (
+          products.length === 0 ? (
+            <EmptyState icon="bag-handle-outline" title="No products yet" subtitle="Check back soon." />
+          ) : (
+            products.map(p => (
+              <ProductCard
+                key={p.id}
+                name={p.name}
+                price={p.price}
+                description={p.description}
+                category={p.category}
+                accent={ACCENT}
+                soft={SOFT}
+                onAdd={() => openProduct(p)}
+              />
+            ))
+          )
+        )}
 
-      {activeTab === 'orders' && orders.map(o => (
-        <View key={o.id} style={styles.card}><Text>{o.product_name} - {o.status}</Text></View>
-      ))}
+        {activeTab === 'cycle' && (
+          <View>
+            <Card style={[styles.hero, { backgroundColor: SOFT }]}>
+              <Text variant="caption" color={ACCENT} style={styles.heroLabel}>CURRENT PHASE</Text>
+              <Text variant="title" color={ACCENT}>{cyclePhase}</Text>
+              {daysUntilNextPeriod != null && nextPeriodDate ? (
+                <View style={styles.heroRow}>
+                  <View>
+                    <Text variant="caption" muted>Next period</Text>
+                    <Text variant="heading">{format(parseISO(nextPeriodDate), 'MMM d')}</Text>
+                  </View>
+                  <View>
+                    <Text variant="caption" muted>Countdown</Text>
+                    <Text variant="heading">{Math.max(0, daysUntilNextPeriod)} days</Text>
+                  </View>
+                </View>
+              ) : (
+                <Text muted style={{ marginTop: spacing.sm }}>{predictionMessage}</Text>
+              )}
+            </Card>
 
-      <AddToCartModal
-        visible={isModalVisible}
-        onClose={() => setIsModalVisible(false)}
-        product={selectedProduct}
-        accent="#e91e63"
-      />
+            <Button title="Log Today's Period" accent={ACCENT} onPress={handleLogPeriod} style={{ marginBottom: spacing.lg }} />
+
+            <Card padded={false} style={{ overflow: 'hidden' }}>
+              <Calendar
+                markedDates={markedDates}
+                onDayPress={handleDayPress}
+                theme={{
+                  todayTextColor: ACCENT,
+                  arrowColor: ACCENT,
+                  selectedDayBackgroundColor: ACCENT,
+                }}
+              />
+            </Card>
+            <Text variant="caption" muted center style={{ marginTop: spacing.sm }}>
+              Tap a date to log or remove a period.
+            </Text>
+          </View>
+        )}
+
+        {activeTab === 'orders' && (
+          orders.length === 0 ? (
+            <EmptyState icon="receipt-outline" title="No orders yet" subtitle="Your orders will appear here." />
+          ) : (
+            orders.map(o => (
+              <OrderCard
+                key={o.id}
+                productName={o.product_name}
+                quantity={o.quantity}
+                total={o.total_price}
+                status={o.status}
+                date={o.created_at}
+              />
+            ))
+          )
+        )}
+
+        <AddToCartModal
+          visible={isModalVisible}
+          onClose={() => setIsModalVisible(false)}
+          product={selectedProduct}
+          accent={ACCENT}
+        />
       </ScrollView>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: '#f5f5f5' },
-  container: { flex: 1, padding: 20, backgroundColor: '#f5f5f5' },
-  tabBar: { flexDirection: 'row', marginBottom: 20 },
-  tab: { flex: 1, padding: 10, alignItems: 'center', backgroundColor: '#ddd' },
-  activeTab: { backgroundColor: '#e91e63' },
-  tabText: { color: '#fff' },
-  card: { backgroundColor: '#fff', padding: 15, borderRadius: 10, marginBottom: 10, flexDirection: 'row', justifyContent: 'space-between' },
-  name: { fontWeight: 'bold' },
-  orderButton: { backgroundColor: '#e91e63', padding: 10, borderRadius: 8 },
-  btnText: { color: '#fff' },
-  phase: { fontSize: 18, fontWeight: 'bold', textAlign: 'center', marginBottom: 10 },
-  logButton: { backgroundColor: '#e91e63', padding: 15, borderRadius: 10, marginBottom: 10 }
+  root: { flex: 1, backgroundColor: colors.background },
+  container: { flex: 1 },
+  content: { padding: spacing.lg, paddingBottom: spacing.xxl },
+  hero: { marginBottom: spacing.lg },
+  heroLabel: { letterSpacing: 1, marginBottom: 2 },
+  heroRow: { flexDirection: 'row', justifyContent: 'space-between', marginTop: spacing.lg },
 });
