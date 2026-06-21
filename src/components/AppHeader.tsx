@@ -6,6 +6,7 @@ import { Ionicons } from '@expo/vector-icons'
 import { Text } from './ui'
 import { useCart } from '../context/CartContext'
 import CartModal from './CartModal'
+import MessageButton from './messaging/MessageButton'
 import { colors, spacing, roleAccent, type Role } from '../theme'
 
 type Props = {
@@ -41,6 +42,8 @@ export default function AppHeader({ role, onNotificationsPress, onCartPress }: P
         <TouchableOpacity onPress={handleNotifications} style={styles.iconBtn} hitSlop={8}>
           <Ionicons name="notifications-outline" size={24} color={colors.gray700} />
         </TouchableOpacity>
+
+        <MessageButton accent={accent} />
 
         <TouchableOpacity onPress={handleCart} style={styles.iconBtn} hitSlop={8}>
           <Ionicons name="cart-outline" size={24} color={colors.gray700} />
