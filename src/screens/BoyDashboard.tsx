@@ -1,14 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, ScrollView, Alert } from 'react-native';
 import { supabase } from '../lib/supabase';
-import { useAuth } from '../context/AuthContext';
 import OrderModal from '../components/OrderModal'; // Shared component
+import AppHeader from '../components/AppHeader';
 
 type Product = { id: number; name: string; description: string; price: number; category: string; };
 type Order = { id: number; product_id: number; product_name: string; quantity: number; total_price: number; status: string; created_at: string; };
 
 export default function BoyDashboard() {
-  const { signOut } = useAuth();
   const [userId, setUserId] = useState<string | null>(null);
   const [products, setProducts] = useState<Product[]>([]);
   const [orders, setOrders] = useState<Order[]>([]);
@@ -39,12 +38,9 @@ export default function BoyDashboard() {
   };
 
   return (
-    <ScrollView style={styles.container}>
-      <View style={styles.header}>
-        <Text style={styles.headerTitle}>MyCare+</Text>
-        <TouchableOpacity onPress={signOut}><Text style={styles.logoutText}>Logout</Text></TouchableOpacity>
-      </View>
-
+    <View style={styles.root}>
+      <AppHeader role="boy" />
+      <ScrollView style={styles.container}>
       <View style={styles.infoCard}>
         <Text style={styles.infoTitle}>HIV Prevention</Text>
         <Text style={styles.infoText}>Use condoms correctly every time</Text>
@@ -86,15 +82,14 @@ export default function BoyDashboard() {
         userId={userId}
         onOrderSuccess={() => { if (userId) loadOrders(userId); }}
       />
-    </ScrollView>
+      </ScrollView>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
+  root: { flex: 1, backgroundColor: '#f5f5f5' },
   container: { flex: 1, padding: 20, backgroundColor: '#f5f5f5' },
-  header: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 20 },
-  headerTitle: { fontSize: 24, fontWeight: 'bold', color: '#2196f3' },
-  logoutText: { color: '#2196f3' },
   infoCard: { backgroundColor: '#e3f2fd', padding: 15, borderRadius: 12, marginBottom: 20 },
   infoTitle: { fontSize: 18, fontWeight: 'bold', color: '#2196f3' },
   infoText: { fontSize: 14, color: '#333' },

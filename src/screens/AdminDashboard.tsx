@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react'
 import { View, Text, TouchableOpacity, StyleSheet, ScrollView, Alert, TextInput, Modal } from 'react-native'
 import { supabase } from '../lib/supabase'
-import { useAuth } from '../context/AuthContext'
+import AppHeader from '../components/AppHeader'
 
 type User = {
   id: string
@@ -36,7 +36,6 @@ type Product = {
 }
 
 export default function AdminDashboard() {
-  const { signOut } = useAuth()
   const [activeTab, setActiveTab] = useState<'users' | 'orders' | 'products'>('users')
   const [users, setUsers] = useState<User[]>([])
   const [orders, setOrders] = useState<Order[]>([])
@@ -267,14 +266,9 @@ export default function AdminDashboard() {
   }
 
   return (
-    <ScrollView style={styles.container}>
-      <View style={styles.header}>
-        <Text style={styles.headerTitle}>Admin Dashboard</Text>
-        <TouchableOpacity onPress={signOut} style={styles.logoutButton}>
-          <Text style={styles.logoutText}>Logout</Text>
-        </TouchableOpacity>
-      </View>
-
+    <View style={styles.root}>
+      <AppHeader role="admin" />
+      <ScrollView style={styles.container}>
       <View style={styles.tabBar}>
         <TouchableOpacity 
           style={[styles.tab, activeTab === 'users' && styles.activeTab]}
@@ -448,34 +442,20 @@ export default function AdminDashboard() {
           </View>
         </View>
       </Modal>
-    </ScrollView>
+      </ScrollView>
+    </View>
   )
 }
 
 const styles = StyleSheet.create({
+  root: {
+    flex: 1,
+    backgroundColor: '#f5f5f5'
+  },
   container: {
     flex: 1,
     backgroundColor: '#f5f5f5',
     padding: 16
-  },
-  header: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 20,
-    marginTop: 10
-  },
-  headerTitle: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    color: '#f44336'
-  },
-  logoutButton: {
-    padding: 8
-  },
-  logoutText: {
-    color: '#f44336',
-    fontSize: 14
   },
   tabBar: {
     flexDirection: 'row',

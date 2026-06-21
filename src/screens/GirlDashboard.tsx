@@ -3,15 +3,14 @@ import { View, Text, TouchableOpacity, StyleSheet, ScrollView, Alert, Modal, Tex
 import { Calendar, DateData } from 'react-native-calendars';
 import { format, parseISO, differenceInDays, addDays } from 'date-fns';
 import { supabase } from '../lib/supabase';
-import { useAuth } from '../context/AuthContext';
 import { loadPeriodDates, savePeriodDates, addPeriodDate, removePeriodDate } from '../utils/periodStorage';
 import OrderModal from '../components/OrderModal';
+import AppHeader from '../components/AppHeader';
 
 type Product = { id: number; name: string; description: string; price: number; category: string; };
 type Order = { id: number; product_id: number; product_name: string; quantity: number; total_price: number; status: string; created_at: string; };
 
 export default function GirlDashboard() {
-  const { signOut } = useAuth();
   const [userId, setUserId] = useState<string | null>(null);
   const [periodDates, setPeriodDates] = useState<string[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
@@ -105,12 +104,9 @@ export default function GirlDashboard() {
   };
 
   return (
-    <ScrollView style={styles.container}>
-      <View style={styles.header}>
-        <Text style={styles.headerTitle}>MyCare+</Text>
-        <TouchableOpacity onPress={signOut}><Text style={styles.logoutText}>Logout</Text></TouchableOpacity>
-      </View>
-
+    <View style={styles.root}>
+      <AppHeader role="girl" />
+      <ScrollView style={styles.container}>
       <View style={styles.tabBar}>
         {(['shop', 'calendar', 'orders'] as const).map(tab => (
           <TouchableOpacity key={tab} style={[styles.tab, activeTab === tab && styles.activeTab]} onPress={() => setActiveTab(tab)}>
@@ -147,15 +143,14 @@ export default function GirlDashboard() {
         userId={userId}
         onOrderSuccess={() => { if (userId) loadOrders(userId); }}
       />
-    </ScrollView>
+      </ScrollView>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
+  root: { flex: 1, backgroundColor: '#f5f5f5' },
   container: { flex: 1, padding: 20, backgroundColor: '#f5f5f5' },
-  header: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 20 },
-  headerTitle: { fontSize: 24, fontWeight: 'bold', color: '#e91e63' },
-  logoutText: { color: '#e91e63' },
   tabBar: { flexDirection: 'row', marginBottom: 20 },
   tab: { flex: 1, padding: 10, alignItems: 'center', backgroundColor: '#ddd' },
   activeTab: { backgroundColor: '#e91e63' },

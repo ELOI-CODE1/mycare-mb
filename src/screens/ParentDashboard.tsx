@@ -1,11 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, ScrollView, Alert } from 'react-native';
 import { supabase } from '../lib/supabase';
-import { useAuth } from '../context/AuthContext';
 import OrderModal from '../components/OrderModal';
+import AppHeader from '../components/AppHeader';
 
 export default function ParentDashboard() {
-  const { signOut } = useAuth();
   const [userId, setUserId] = useState<string | null>(null);
   const [products, setProducts] = useState<any[]>([]);
   const [orders, setOrders] = useState<any[]>([]);
@@ -45,12 +44,9 @@ export default function ParentDashboard() {
   };
 
   return (
-    <ScrollView style={styles.container}>
-      <View style={styles.header}>
-        <Text style={styles.headerTitle}>Family Care</Text>
-        <TouchableOpacity onPress={signOut}><Text style={styles.logoutText}>Logout</Text></TouchableOpacity>
-      </View>
-
+    <View style={styles.root}>
+      <AppHeader role="parent" />
+      <ScrollView style={styles.container}>
       {/* Shop List */}
       {products.map((product) => (
         <View key={product.id} style={styles.card}>
@@ -78,15 +74,14 @@ export default function ParentDashboard() {
           Alert.alert("Success", "Order confirmed!");
         }}
       />
-    </ScrollView>
+      </ScrollView>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
+  root: { flex: 1, backgroundColor: '#f5f5f5' },
   container: { flex: 1, padding: 20, backgroundColor: '#f5f5f5' },
-  header: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 20 },
-  headerTitle: { fontSize: 24, fontWeight: 'bold', color: '#4caf50' },
-  logoutText: { color: '#4caf50' },
   card: { backgroundColor: '#fff', padding: 15, borderRadius: 10, marginBottom: 10, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   name: { fontWeight: 'bold', fontSize: 16 },
   price: { color: '#4caf50', marginTop: 5 },
