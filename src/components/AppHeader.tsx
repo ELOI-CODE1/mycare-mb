@@ -12,6 +12,8 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
 import { Text, Button } from './ui'
 import { useAuth } from '../context/AuthContext'
+import { useCart } from '../context/CartContext'
+import CartModal from './CartModal'
 import { colors, spacing, radius, roleAccent, roleColors, type Role } from '../theme'
 
 type Props = {
@@ -23,14 +25,16 @@ type Props = {
 export default function AppHeader({ role, onNotificationsPress, onCartPress }: Props) {
   const insets = useSafeAreaInsets()
   const { profile, signOut } = useAuth()
+  const { totalItems } = useCart()
   const [accountVisible, setAccountVisible] = useState(false)
+  const [cartVisible, setCartVisible] = useState(false)
 
   const accent = roleAccent(role)
   const soft = (role && roleColors[role as Role]?.soft) || colors.gray100
 
   const handleNotifications =
     onNotificationsPress ?? (() => Alert.alert('Notifications', 'You have no new notifications.'))
-  const handleCart = onCartPress ?? (() => Alert.alert('Cart', 'Your cart is empty.'))
+  const handleCart = onCartPress ?? (() => setCartVisible(true))
 
   const joined = profile?.created_at ? new Date(profile.created_at).toLocaleDateString() : '—'
 
@@ -51,6 +55,13 @@ export default function AppHeader({ role, onNotificationsPress, onCartPress }: P
         </TouchableOpacity>
         <TouchableOpacity onPress={handleCart} style={styles.iconBtn} hitSlop={8}>
           <Ionicons name="cart-outline" size={24} color={colors.gray700} />
+          {totalItems > 0 && (
+            <View style={[styles.badge, { backgroundColor: accent }]}>
+              <Text variant="caption" color={colors.textInverse} style={styles.badgeText}>
+                {totalItems > 99 ? '99+' : totalItems}
+              </Text>
+            </View>
+          )}
         </TouchableOpacity>
         <TouchableOpacity onPress={() => setAccountVisible(true)} style={styles.iconBtn} hitSlop={8}>
           <Ionicons name="person-circle-outline" size={26} color={accent} />
@@ -96,6 +107,9 @@ export default function AppHeader({ role, onNotificationsPress, onCartPress }: P
           </Pressable>
         </Pressable>
       </Modal>
+
+      {/* Cart + checkout */}
+      <CartModal visible={cartVisible} onClose={() => setCartVisible(false)} accent={accent} />
     </View>
   )
 }
@@ -128,6 +142,18 @@ const styles = StyleSheet.create({
   logo: { width: 28, height: 28, borderRadius: 6 },
   actions: { flexDirection: 'row', alignItems: 'center', gap: spacing.lg },
   iconBtn: { padding: 2 },
+  badge: {
+    position: 'absolute',
+    top: -6,
+    right: -8,
+    minWidth: 18,
+    height: 18,
+    borderRadius: 9,
+    paddingHorizontal: 4,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  badgeText: { fontSize: 10, fontWeight: '700' as any, lineHeight: 14 },
 
   overlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.45)', justifyContent: 'flex-end' },
   sheet: {

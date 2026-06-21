@@ -1,13 +1,15 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, ScrollView, Alert } from 'react-native';
 import { supabase } from '../lib/supabase';
-import OrderModal from '../components/OrderModal'; // Shared component
+import AddToCartModal from '../components/AddToCartModal';
 import AppHeader from '../components/AppHeader';
+import { useCart } from '../context/CartContext';
 
 type Product = { id: number; name: string; description: string; price: number; category: string; };
 type Order = { id: number; product_id: number; product_name: string; quantity: number; total_price: number; status: string; created_at: string; };
 
 export default function BoyDashboard() {
+  const { checkoutCount } = useCart();
   const [userId, setUserId] = useState<string | null>(null);
   const [products, setProducts] = useState<Product[]>([]);
   const [orders, setOrders] = useState<Order[]>([]);
@@ -18,6 +20,11 @@ export default function BoyDashboard() {
   useEffect(() => {
     init();
   }, []);
+
+  // Refresh orders after a successful cart checkout.
+  useEffect(() => {
+    if (userId) loadOrders(userId);
+  }, [checkoutCount]);
 
   const init = async () => {
     const { data: { user } } = await supabase.auth.getUser();
@@ -75,12 +82,11 @@ export default function BoyDashboard() {
         </View>
       ))}
 
-      <OrderModal 
+      <AddToCartModal
         visible={isModalVisible}
         onClose={() => setIsModalVisible(false)}
         product={selectedProduct}
-        userId={userId}
-        onOrderSuccess={() => { if (userId) loadOrders(userId); }}
+        accent="#2196f3"
       />
       </ScrollView>
     </View>

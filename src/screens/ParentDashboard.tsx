@@ -1,10 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, ScrollView, Alert } from 'react-native';
 import { supabase } from '../lib/supabase';
-import OrderModal from '../components/OrderModal';
+import AddToCartModal from '../components/AddToCartModal';
 import AppHeader from '../components/AppHeader';
+import { useCart } from '../context/CartContext';
 
 export default function ParentDashboard() {
+  const { checkoutCount } = useCart();
   const [userId, setUserId] = useState<string | null>(null);
   const [products, setProducts] = useState<any[]>([]);
   const [orders, setOrders] = useState<any[]>([]);
@@ -17,6 +19,11 @@ export default function ParentDashboard() {
   useEffect(() => {
     init();
   }, []);
+
+  // Refresh orders after a successful cart checkout.
+  useEffect(() => {
+    if (userId) loadOrders(userId);
+  }, [checkoutCount]);
 
   const init = async () => {
     const { data: { user } } = await supabase.auth.getUser();
@@ -64,15 +71,11 @@ export default function ParentDashboard() {
       ))}
 
       {/* MODAL IS PLACED HERE */}
-      <OrderModal 
+      <AddToCartModal
         visible={isOrderModalVisible}
         onClose={() => setIsOrderModalVisible(false)}
         product={selectedProduct}
-        userId={userId}
-        onOrderSuccess={() => {
-          if (userId) loadOrders(userId);
-          Alert.alert("Success", "Order confirmed!");
-        }}
+        accent="#4caf50"
       />
       </ScrollView>
     </View>

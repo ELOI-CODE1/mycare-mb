@@ -4,13 +4,15 @@ import { Calendar, DateData } from 'react-native-calendars';
 import { format, parseISO, differenceInDays, addDays } from 'date-fns';
 import { supabase } from '../lib/supabase';
 import { loadPeriodDates, savePeriodDates, addPeriodDate, removePeriodDate } from '../utils/periodStorage';
-import OrderModal from '../components/OrderModal';
+import AddToCartModal from '../components/AddToCartModal';
 import AppHeader from '../components/AppHeader';
+import { useCart } from '../context/CartContext';
 
 type Product = { id: number; name: string; description: string; price: number; category: string; };
 type Order = { id: number; product_id: number; product_name: string; quantity: number; total_price: number; status: string; created_at: string; };
 
 export default function GirlDashboard() {
+  const { checkoutCount } = useCart();
   const [userId, setUserId] = useState<string | null>(null);
   const [periodDates, setPeriodDates] = useState<string[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
@@ -30,6 +32,11 @@ export default function GirlDashboard() {
   useEffect(() => {
     init();
   }, []);
+
+  // Refresh orders after a successful cart checkout.
+  useEffect(() => {
+    if (userId) loadOrders(userId);
+  }, [checkoutCount]);
 
   const init = async () => {
     const { data: { user } } = await supabase.auth.getUser();
@@ -136,12 +143,11 @@ export default function GirlDashboard() {
         <View key={o.id} style={styles.card}><Text>{o.product_name} - {o.status}</Text></View>
       ))}
 
-      <OrderModal 
+      <AddToCartModal
         visible={isModalVisible}
         onClose={() => setIsModalVisible(false)}
         product={selectedProduct}
-        userId={userId}
-        onOrderSuccess={() => { if (userId) loadOrders(userId); }}
+        accent="#e91e63"
       />
       </ScrollView>
     </View>
