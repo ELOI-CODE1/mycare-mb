@@ -5,6 +5,7 @@ import { supabase } from '../lib/supabase'
 import AppHeader from '../components/AppHeader'
 import { Text, Card, Button, Input, Badge, Segmented, EmptyState } from '../components/ui'
 import { categoryEmoji } from '../components/ProductCard'
+import AdminOverview from '../components/admin/AdminOverview'
 import { colors, spacing, radius, roleColors } from '../theme'
 
 type User = {
@@ -44,7 +45,7 @@ const SOFT = roleColors.admin.soft
 const STATUSES = ['pending', 'confirmed', 'shipped', 'delivered', 'cancelled']
 
 export default function AdminDashboard() {
-  const [activeTab, setActiveTab] = useState<'users' | 'orders' | 'products'>('users')
+  const [activeTab, setActiveTab] = useState<'overview' | 'users' | 'orders' | 'products'>('overview')
   const [users, setUsers] = useState<User[]>([])
   const [orders, setOrders] = useState<Order[]>([])
   const [products, setProducts] = useState<Product[]>([])
@@ -194,8 +195,18 @@ export default function AdminDashboard() {
           accent={ACCENT}
           value={activeTab}
           onChange={(k) => setActiveTab(k as any)}
-          tabs={[{ key: 'users', label: 'Users' }, { key: 'orders', label: 'Orders' }, { key: 'products', label: 'Products' }]}
+          tabs={[
+            { key: 'overview', label: 'Overview' },
+            { key: 'users', label: 'Users' },
+            { key: 'orders', label: 'Orders' },
+            { key: 'products', label: 'Products' },
+          ]}
         />
+
+        {/* OVERVIEW */}
+        {activeTab === 'overview' && (
+          <AdminOverview orders={orders} productCount={products.length} accent={ACCENT} soft={SOFT} />
+        )}
 
         {/* USERS */}
         {activeTab === 'users' && (
