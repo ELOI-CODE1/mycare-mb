@@ -9,15 +9,17 @@ interface Props {
   scroll?: boolean
   /** Apply default horizontal/vertical padding (default true). */
   padded?: boolean
+  /** Pad for the status bar / notch (default true). Set false under a native header. */
+  topInset?: boolean
   background?: string
   style?: ViewStyle
 }
 
-export function Screen({ children, scroll = true, padded = true, background, style }: Props) {
+export function Screen({ children, scroll = true, padded = true, topInset = true, background, style }: Props) {
   const insets = useSafeAreaInsets()
   const containerStyle = [
     styles.container,
-    { backgroundColor: background ?? colors.background, paddingTop: insets.top },
+    { backgroundColor: background ?? colors.background, paddingTop: topInset ? insets.top : 0 },
     style,
   ]
   const contentPad = padded ? { padding: spacing.lg } : undefined

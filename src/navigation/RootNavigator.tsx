@@ -11,11 +11,21 @@ import BoyDashboard from '../screens/BoyDashboard'
 import ParentDashboard from '../screens/ParentDashboard'
 import AdminDashboard from '../screens/AdminDashboard'
 import NoRoleScreen from '../screens/NoRoleScreen'
+import AccountScreen from '../screens/AccountScreen'
+import ProfileScreen from '../screens/ProfileScreen'
+import SettingsScreen from '../screens/SettingsScreen'
+import SecurityScreen from '../screens/SecurityScreen'
+import AboutScreen from '../screens/AboutScreen'
 
 export type RootStackParamList = {
   Login: undefined
   SignUp: undefined
   Home: undefined
+  Account: undefined
+  Profile: undefined
+  Settings: undefined
+  Security: undefined
+  About: undefined
 }
 
 const Stack = createNativeStackNavigator<RootStackParamList>()
@@ -58,7 +68,34 @@ export default function RootNavigator() {
           <Stack.Screen name="SignUp" component={SignUp} />
         </>
       ) : (
-        <Stack.Screen name="Home" component={RoleRouter} />
+        <>
+          <Stack.Screen name="Home" component={RoleRouter} />
+          <Stack.Screen
+            name="Account"
+            component={AccountScreen}
+            options={{ headerShown: true, title: 'Account', headerBackTitle: 'Back' }}
+          />
+          <Stack.Screen
+            name="Profile"
+            component={ProfileScreen}
+            options={{ headerShown: true, title: 'My Profile', headerBackTitle: 'Back' }}
+          />
+          <Stack.Screen
+            name="Settings"
+            component={SettingsScreen}
+            options={{ headerShown: true, title: 'Settings', headerBackTitle: 'Back' }}
+          />
+          <Stack.Screen
+            name="Security"
+            component={SecurityScreen}
+            options={{ headerShown: true, title: 'Security & Privacy', headerBackTitle: 'Back' }}
+          />
+          <Stack.Screen
+            name="About"
+            component={AboutScreen}
+            options={{ headerShown: true, title: 'About MyCare+', headerBackTitle: 'Back' }}
+          />
+        </>
       )}
     </Stack.Navigator>
   )
