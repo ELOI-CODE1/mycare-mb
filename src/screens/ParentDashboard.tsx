@@ -1,9 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, ScrollView, Alert } from 'react-native';
 import { supabase } from '../lib/supabase';
+import { useAuth } from '../context/AuthContext';
 import OrderModal from '../components/OrderModal';
 
-export default function ParentDashboard({ onLogout }: { onLogout: () => void }) {
+export default function ParentDashboard() {
+  const { signOut } = useAuth();
   const [userId, setUserId] = useState<string | null>(null);
   const [products, setProducts] = useState<any[]>([]);
   const [orders, setOrders] = useState<any[]>([]);
@@ -46,7 +48,7 @@ export default function ParentDashboard({ onLogout }: { onLogout: () => void }) 
     <ScrollView style={styles.container}>
       <View style={styles.header}>
         <Text style={styles.headerTitle}>Family Care</Text>
-        <TouchableOpacity onPress={onLogout}><Text style={styles.logoutText}>Logout</Text></TouchableOpacity>
+        <TouchableOpacity onPress={signOut}><Text style={styles.logoutText}>Logout</Text></TouchableOpacity>
       </View>
 
       {/* Shop List */}

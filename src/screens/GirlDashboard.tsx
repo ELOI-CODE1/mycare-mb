@@ -3,13 +3,15 @@ import { View, Text, TouchableOpacity, StyleSheet, ScrollView, Alert, Modal, Tex
 import { Calendar, DateData } from 'react-native-calendars';
 import { format, parseISO, differenceInDays, addDays } from 'date-fns';
 import { supabase } from '../lib/supabase';
+import { useAuth } from '../context/AuthContext';
 import { loadPeriodDates, savePeriodDates, addPeriodDate, removePeriodDate } from '../utils/periodStorage';
 import OrderModal from '../components/OrderModal';
 
 type Product = { id: number; name: string; description: string; price: number; category: string; };
 type Order = { id: number; product_id: number; product_name: string; quantity: number; total_price: number; status: string; created_at: string; };
 
-export default function GirlDashboard({ onLogout }: { onLogout: () => void }) {
+export default function GirlDashboard() {
+  const { signOut } = useAuth();
   const [userId, setUserId] = useState<string | null>(null);
   const [periodDates, setPeriodDates] = useState<string[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
@@ -106,7 +108,7 @@ export default function GirlDashboard({ onLogout }: { onLogout: () => void }) {
     <ScrollView style={styles.container}>
       <View style={styles.header}>
         <Text style={styles.headerTitle}>MyCare+</Text>
-        <TouchableOpacity onPress={onLogout}><Text style={styles.logoutText}>Logout</Text></TouchableOpacity>
+        <TouchableOpacity onPress={signOut}><Text style={styles.logoutText}>Logout</Text></TouchableOpacity>
       </View>
 
       <View style={styles.tabBar}>

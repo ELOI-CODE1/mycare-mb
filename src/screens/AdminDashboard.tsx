@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react'
 import { View, Text, TouchableOpacity, StyleSheet, ScrollView, Alert, TextInput, Modal } from 'react-native'
 import { supabase } from '../lib/supabase'
+import { useAuth } from '../context/AuthContext'
 
 type User = {
   id: string
@@ -34,7 +35,8 @@ type Product = {
   is_available: boolean
 }
 
-export default function AdminDashboard({ onLogout }: { onLogout: () => void }) {
+export default function AdminDashboard() {
+  const { signOut } = useAuth()
   const [activeTab, setActiveTab] = useState<'users' | 'orders' | 'products'>('users')
   const [users, setUsers] = useState<User[]>([])
   const [orders, setOrders] = useState<Order[]>([])
@@ -268,7 +270,7 @@ export default function AdminDashboard({ onLogout }: { onLogout: () => void }) {
     <ScrollView style={styles.container}>
       <View style={styles.header}>
         <Text style={styles.headerTitle}>Admin Dashboard</Text>
-        <TouchableOpacity onPress={onLogout} style={styles.logoutButton}>
+        <TouchableOpacity onPress={signOut} style={styles.logoutButton}>
           <Text style={styles.logoutText}>Logout</Text>
         </TouchableOpacity>
       </View>

@@ -1,8 +1,15 @@
 import React, { useState } from 'react'
-import { View, Text, TextInput, TouchableOpacity, StyleSheet, Alert } from 'react-native'
-import { supabase } from '../lib/supabase'
+import { View, Alert, TouchableOpacity } from 'react-native'
+import type { NativeStackScreenProps } from '@react-navigation/native-stack'
+import { Screen, Text, Input, Button } from '../components/ui'
+import { useAuth } from '../context/AuthContext'
+import { colors, spacing } from '../theme'
+import type { RootStackParamList } from '../navigation/RootNavigator'
 
-export default function Login({ onLogin }: { onLogin: () => void }) {
+type Props = NativeStackScreenProps<RootStackParamList, 'Login'>
+
+export default function Login({ navigation }: Props) {
+  const { signIn } = useAuth()
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [loading, setLoading] = useState(false)
@@ -12,109 +19,50 @@ export default function Login({ onLogin }: { onLogin: () => void }) {
       Alert.alert('Error', 'Please enter email and password')
       return
     }
-    
     setLoading(true)
-    
-    const { data, error } = await supabase.auth.signInWithPassword({
-      email: email,
-      password: password
-    })
-    
+    const { error } = await signIn(email, password)
+    setLoading(false)
     if (error) {
-      setLoading(false)
-      Alert.alert('Login Failed', error.message)
-      return
+      Alert.alert('Login Failed', error)
     }
-    
-    if (data.user) {
-      console.log('USER ID FROM AUTH:', data.user.id)
-      console.log('USER EMAIL:', data.user.email)
-      
-      // Get profile
-      const { data: profile, error: profileError } = await supabase
-        .from('profiles')
-        .select('*')
-        .eq('id', data.user.id)
-      
-      console.log('PROFILE QUERY RESULT:', profile)
-      console.log('PROFILE ERROR:', profileError)
-      
-      setLoading(false)
-      onLogin()
-    }
+    // On success the auth state changes and the navigator swaps automatically.
   }
 
   return (
-    <View style={styles.container}>
-      <Text style={styles.title}>MyCare+</Text>
-      <Text style={styles.subtitle}>Login to your account</Text>
-      
-      <TextInput
-        style={styles.input}
-        placeholder="Email"
-        value={email}
-        onChangeText={setEmail}
-        autoCapitalize="none"
-        keyboardType="email-address"
-      />
-      
-      <TextInput
-        style={styles.input}
-        placeholder="Password"
-        value={password}
-        onChangeText={setPassword}
-        secureTextEntry
-      />
-      
-      <TouchableOpacity 
-        style={styles.button}
-        onPress={handleLogin}
-        disabled={loading}
-      >
-        <Text style={styles.buttonText}>{loading ? 'Logging in...' : 'Login'}</Text>
-      </TouchableOpacity>
-    </View>
+    <Screen background={colors.surface}>
+      <View style={{ flex: 1, justifyContent: 'center', minHeight: 480 }}>
+        <Text variant="display" color={colors.primary} center>
+          MyCare+
+        </Text>
+        <Text muted center style={{ marginBottom: spacing.xxl }}>
+          Login to your account
+        </Text>
+
+        <Input
+          label="Email"
+          placeholder="you@example.com"
+          value={email}
+          onChangeText={setEmail}
+          autoCapitalize="none"
+          keyboardType="email-address"
+        />
+        <Input
+          label="Password"
+          placeholder="••••••••"
+          value={password}
+          onChangeText={setPassword}
+          secureTextEntry
+        />
+
+        <Button title="Login" onPress={handleLogin} loading={loading} />
+
+        <TouchableOpacity
+          style={{ marginTop: spacing.xl, alignItems: 'center' }}
+          onPress={() => navigation.navigate('SignUp')}
+        >
+          <Text color={colors.primary}>Don't have an account? Sign Up</Text>
+        </TouchableOpacity>
+      </View>
+    </Screen>
   )
 }
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    justifyContent: 'center',
-    padding: 20,
-    backgroundColor: '#fff'
-  },
-  title: {
-    fontSize: 36,
-    fontWeight: 'bold',
-    color: '#e91e63',
-    textAlign: 'center',
-    marginBottom: 10
-  },
-  subtitle: {
-    fontSize: 16,
-    color: '#666',
-    textAlign: 'center',
-    marginBottom: 40
-  },
-  input: {
-    borderWidth: 1,
-    borderColor: '#ddd',
-    borderRadius: 10,
-    padding: 15,
-    marginBottom: 15,
-    fontSize: 16
-  },
-  button: {
-    backgroundColor: '#e91e63',
-    padding: 15,
-    borderRadius: 10,
-    alignItems: 'center',
-    marginTop: 10
-  },
-  buttonText: {
-    color: '#fff',
-    fontSize: 18,
-    fontWeight: '600'
-  }
-})

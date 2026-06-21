@@ -1,148 +1,23 @@
-import React, { useEffect, useState } from 'react'
-import { SafeAreaView, StatusBar, ActivityIndicator, View, Text, TouchableOpacity } from 'react-native'
-import { supabase } from './src/lib/supabase'
-import Login from './src/screens/Login'
-import SignUp from './src/screens/SignUp'
-import GirlDashboard from './src/screens/GirlDashboard'
-import BoyDashboard from './src/screens/BoyDashboard'
-import ParentDashboard from './src/screens/ParentDashboard'
-import AdminDashboard from './src/screens/AdminDashboard'
-
-type Screen = 'login' | 'signup'
+import 'react-native-gesture-handler'
+import React from 'react'
+import { GestureHandlerRootView } from 'react-native-gesture-handler'
+import { SafeAreaProvider } from 'react-native-safe-area-context'
+import { NavigationContainer } from '@react-navigation/native'
+import { StatusBar } from 'expo-status-bar'
+import { AuthProvider } from './src/context/AuthContext'
+import RootNavigator from './src/navigation/RootNavigator'
 
 export default function App() {
-  const [loading, setLoading] = useState(true)
-  const [currentScreen, setCurrentScreen] = useState<Screen>('login')
-  const [userRole, setUserRole] = useState<string | null>(null)
-  const [isLoggedIn, setIsLoggedIn] = useState(false)
-
-  useEffect(() => {
-    checkUser()
-  }, [])
-
-  const checkUser = async () => {
-    try {
-      const { data: { session } } = await supabase.auth.getSession()
-      
-      if (session?.user) {
-        console.log('Session user ID:', session.user.id)
-        
-        const { data: profile, error } = await supabase
-          .from('profiles')
-          .select('role')
-          .eq('id', session.user.id)
-        
-        console.log('Profile data:', profile)
-        console.log('Profile error:', error)
-        
-        if (profile && profile.length > 0) {
-          console.log('Found role:', profile[0].role)
-          setUserRole(profile[0].role)
-          setIsLoggedIn(true)
-        } else {
-          console.log('No profile found for user')
-          setIsLoggedIn(false)
-        }
-      } else {
-        setIsLoggedIn(false)
-      }
-    } catch (err) {
-      console.log('Check user error:', err)
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  const handleLogin = () => {
-    checkUser()
-  }
-
-  const handleLogout = async () => {
-    await supabase.auth.signOut()
-    setIsLoggedIn(false)
-    setUserRole(null)
-    setCurrentScreen('login')
-  }
-
-  if (loading) {
-    return (
-      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
-        <ActivityIndicator size="large" color="#e91e63" />
-      </View>
-    )
-  }
-
-  if (!isLoggedIn) {
-    if (currentScreen === 'signup') {
-      return (
-        <SafeAreaView style={{ flex: 1 }}>
-          <StatusBar barStyle="dark-content" />
-          <SignUp onSignUpComplete={() => setCurrentScreen('login')} />
-        </SafeAreaView>
-      )
-    }
-    
-    return (
-      <SafeAreaView style={{ flex: 1 }}>
-        <StatusBar barStyle="dark-content" />
-        <Login onLogin={handleLogin} />
-        <TouchableOpacity 
-          style={{ position: 'absolute', bottom: 30, left: 0, right: 0, alignItems: 'center' }}
-          onPress={() => setCurrentScreen('signup')}
-        >
-          <Text style={{ color: '#e91e63', fontSize: 14 }}>Don't have an account? Sign Up</Text>
-        </TouchableOpacity>
-      </SafeAreaView>
-    )
-  }
-
-  console.log('Rendering dashboard for role:', userRole)
-
-  if (userRole === 'admin') {
-    return (
-      <SafeAreaView style={{ flex: 1 }}>
-        <StatusBar barStyle="dark-content" />
-        <AdminDashboard onLogout={handleLogout} />
-      </SafeAreaView>
-    )
-  }
-
-  if (userRole === 'girl') {
-    return (
-      <SafeAreaView style={{ flex: 1 }}>
-        <StatusBar barStyle="dark-content" />
-        <GirlDashboard onLogout={handleLogout} />
-      </SafeAreaView>
-    )
-  }
-
-  if (userRole === 'boy') {
-    return (
-      <SafeAreaView style={{ flex: 1 }}>
-        <StatusBar barStyle="dark-content" />
-        <BoyDashboard onLogout={handleLogout} />
-      </SafeAreaView>
-    )
-  }
-
-  if (userRole === 'parent') {
-    return (
-      <SafeAreaView style={{ flex: 1 }}>
-        <StatusBar barStyle="dark-content" />
-        <ParentDashboard onLogout={handleLogout} />
-      </SafeAreaView>
-    )
-  }
-
   return (
-    <SafeAreaView style={{ flex: 1 }}>
-      <StatusBar barStyle="dark-content" />
-      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', padding: 20 }}>
-        <Text style={{ fontSize: 18, marginBottom: 20 }}>No role assigned. Role: {userRole}</Text>
-        <TouchableOpacity onPress={handleLogout} style={{ backgroundColor: '#e91e63', padding: 15, borderRadius: 10 }}>
-          <Text style={{ color: '#fff' }}>Logout</Text>
-        </TouchableOpacity>
-      </View>
-    </SafeAreaView>
+    <GestureHandlerRootView style={{ flex: 1 }}>
+      <SafeAreaProvider>
+        <AuthProvider>
+          <NavigationContainer>
+            <StatusBar style="dark" />
+            <RootNavigator />
+          </NavigationContainer>
+        </AuthProvider>
+      </SafeAreaProvider>
+    </GestureHandlerRootView>
   )
 }

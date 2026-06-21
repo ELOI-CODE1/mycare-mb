@@ -1,12 +1,14 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, ScrollView, Alert } from 'react-native';
 import { supabase } from '../lib/supabase';
+import { useAuth } from '../context/AuthContext';
 import OrderModal from '../components/OrderModal'; // Shared component
 
 type Product = { id: number; name: string; description: string; price: number; category: string; };
 type Order = { id: number; product_id: number; product_name: string; quantity: number; total_price: number; status: string; created_at: string; };
 
-export default function BoyDashboard({ onLogout }: { onLogout: () => void }) {
+export default function BoyDashboard() {
+  const { signOut } = useAuth();
   const [userId, setUserId] = useState<string | null>(null);
   const [products, setProducts] = useState<Product[]>([]);
   const [orders, setOrders] = useState<Order[]>([]);
@@ -40,7 +42,7 @@ export default function BoyDashboard({ onLogout }: { onLogout: () => void }) {
     <ScrollView style={styles.container}>
       <View style={styles.header}>
         <Text style={styles.headerTitle}>MyCare+</Text>
-        <TouchableOpacity onPress={onLogout}><Text style={styles.logoutText}>Logout</Text></TouchableOpacity>
+        <TouchableOpacity onPress={signOut}><Text style={styles.logoutText}>Logout</Text></TouchableOpacity>
       </View>
 
       <View style={styles.infoCard}>
