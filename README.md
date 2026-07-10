@@ -1,4 +1,4 @@
-# MyCarePlus
+# MyCare+ &nbsp;<sub>(`MyCarePlus` repo)</sub>
 
 A React Native / Expo mobile app for **menstrual & reproductive health tracking** with a built-in **health shop**, **user⇄admin messaging**, and **role-based dashboards** (girl / boy / parent / admin). Backed by [Supabase](https://supabase.com) for auth and data.
 
@@ -33,18 +33,27 @@ A React Native / Expo mobile app for **menstrual & reproductive health tracking*
 | Local storage | `@react-native-async-storage/async-storage`, `expo-secure-store` |
 | Notifications | `expo-notifications` |
 | Calendar / charts | `react-native-calendars`, `react-native-chart-kit` + `react-native-svg` |
+| Image upload | `expo-image-picker` + `base64-arraybuffer` → Supabase Storage |
 
 ---
 
 ## Features
 
 - **Role-based experience** — four user roles derived from a signup questionnaire: `girl`, `boy`, `parent`, `admin`. Each gets its own dashboard.
+- **Branding** — the app is branded **"MyCare+"**. The loading/splash screen shows the **name only (no logo)**, and the in-app header is a clean text wordmark.
 - **Menstrual cycle tracking** (girl / parent) — calendar logging, a **period prediction engine** (cycle-length statistics, confidence scoring, irregularity detection) and adaptive **reminder notifications**.
-- **In-app health shop** — a product catalog (pads, condoms, pain relief, hygiene, test kits) with role-based visibility, a persistent cart, and order placement.
-- **Order history** — past orders per user.
+- **In-app health shop** — a product catalog (pads, condoms, pain relief, hygiene, test kits) with role-based visibility, **product images**, a persistent cart, and order placement.
+- **Product search** — a search box in every shopper's Shop tab (filter by name/description).
+- **Order history + search** — past orders per user, with a search box.
 - **User⇄Admin messaging** — threaded messaging between users and admins.
-- **Admin dashboard** — user management (suspend / soft-delete), overview stats, message inbox, and an audit log.
-- **Account management** — profile, settings, security/privacy, and about screens.
+- **Admin dashboard**:
+  - **Overview** — sales/revenue stats + monthly revenue chart.
+  - **Users** — suspend / soft-delete + audit log.
+  - **Products** — full CRUD with a **product-image upload**, a **category picker**, and a **"Visible to" tag selector** (choose any of `girl` / `boy` / `parent`); searchable list.
+  - **Orders** — compact cards (customer name + product + status) with **Manage** (change status: pending / confirmed / shipped / delivered / cancelled) and **Detail** (full order info) actions; a **search box** plus **status-filter chips** (All / pending / confirmed / shipped / delivered / cancelled).
+  - No shopping cart icon (admins manage, they don't buy).
+- **Editable profile** — every user (including admin) can edit their **name & phone** and set a **profile photo**. Email changes go through support.
+- **Account management** — profile, settings, security/privacy (biometric unlock removed), and about screens.
 
 ---
 
@@ -114,8 +123,9 @@ MyCarePlus/
 ├── scripts/
 │   └── seed-dev.mjs            # Creates a dev/admin account in Supabase
 ├── supabase/
-│   ├── admin_user_management.sql  # profiles.status, audit log, RLS
-│   └── messages.sql               # messages table + RLS
+│   ├── admin_user_management.sql       # profiles.status, audit log, RLS
+│   ├── messages.sql                    # messages table + RLS
+│   └── product_and_profile_images.sql  # image_url/avatar_url columns + Storage buckets + policies
 ├── assets/                     # icons + splash
 └── src/
     ├── components/
@@ -129,7 +139,8 @@ MyCarePlus/
     │   ├── AuthContext.tsx     # Session + profile + role
     │   └── CartContext.tsx     # Cart state (persisted)
     ├── lib/
-    │   └── supabase.ts         # Supabase client
+    │   ├── supabase.ts         # Supabase client
+    │   └── uploadImage.ts      # Pick + upload images to Supabase Storage
     ├── navigation/
     │   └── RootNavigator.tsx   # Auth-gated native-stack + RoleRouter
     ├── screens/
@@ -138,7 +149,7 @@ MyCarePlus/
     │   └── Account / Profile / Settings / Security / About
     ├── theme/                  # Design tokens (colors, spacing, per-role colors)
     ├── data/
-    │   └── products.ts         # Static product catalog
+    │   └── products.ts         # Legacy static catalog (unused — products now come from Supabase)
     └── utils/
         ├── notificationService.ts  # Period reminder notifications
         ├── periodPredictor.ts.ts   # Cycle prediction engine
@@ -196,10 +207,20 @@ The Supabase client lives in `src/lib/supabase.ts`. It uses `AsyncStorage` for s
 
 | Table | Purpose |
 |-------|---------|
-| `profiles` | User profile + `role` + `status` (`active` / `suspended` / `deleted`) |
-| `orders` | Placed orders (`product_id, product_name, quantity, total_price, status`) |
+| `profiles` | User profile + `role` + `status` (`active` / `suspended` / `deleted`) + `avatar_url` (profile photo) |
+| `products` | Shop catalog (`name, description, price, category, visible_to[], is_available, image_url`) |
+| `orders` | Placed orders (`product_id, quantity, total_price, delivery_address, status`) |
 | `messages` | User⇄admin threaded messaging (`sender`, `is_read`) |
 | `admin_audit_log` | Admin action audit trail |
+
+### Storage buckets
+
+Two **public** Supabase Storage buckets hold uploaded images:
+
+| Bucket | Purpose | Write access |
+|--------|---------|--------------|
+| `product-images` | Product photos | Admins only |
+| `avatars` | Profile photos | Each user, own file only |
 
 ### Applying the schema
 
@@ -207,6 +228,9 @@ The SQL in `supabase/` must be run **manually** in the Supabase **SQL Editor** (
 
 1. `supabase/admin_user_management.sql` — adds `profiles.status`, the `admin_audit_log` table, an `is_admin()` helper, and RLS policies.
 2. `supabase/messages.sql` — creates the `messages` table, indexes, and RLS policies.
+3. `supabase/product_and_profile_images.sql` — adds `products.image_url` + `profiles.avatar_url`, creates the `product-images` and `avatars` Storage buckets, and their read/write policies. **Requires `is_admin()` from step 1**, so run it after that.
+
+> **Note:** the `products` table itself must already exist (the app reads/writes it). If your project doesn't have it yet, create it with the columns listed above before running step 3.
 
 ---
 
@@ -231,6 +255,7 @@ node scripts/seed-dev.mjs
 These are worth knowing before extending or shipping the app:
 
 - 🔐 **Hardcoded credentials.** The Supabase URL + anon key are committed in `src/lib/supabase.ts` (there's a `// TODO` to move them to env config and rotate the key), and `seed-dev.mjs` has a hardcoded dev password. Move these to environment variables and rotate before any production use.
+- 🖼️ **Image features need the Storage setup.** Product-image and profile-photo uploads only work **after** `supabase/product_and_profile_images.sql` has been run (columns + buckets + policies). Until then, the app shows category-emoji / person-icon fallbacks. The `expo-image-picker` config plugin is already declared in `app.json`.
 - 🧩 **Unused dependencies.** `react-native-dotenv`, `flutterwave-react-native`, and `@react-navigation/bottom-tabs` are installed but **not wired in**. In particular, **payments are not implemented** — checkout currently just inserts an order with `status: 'pending'`; Flutterwave is a placeholder.
 - 🔔 **Notifications plugin not declared.** `expo-notifications` is used (`src/utils/notificationService.ts`, Android `period-reminders` channel) but there is no notifications config plugin in `app.json` — add it before a production build.
 - 🗂️ **`src/utils/periodPredictor.ts.ts`** has a doubled `.ts.ts` extension.
