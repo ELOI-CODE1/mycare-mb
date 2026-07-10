@@ -9,6 +9,7 @@ export type Profile = {
   full_name: string
   role: Role | string
   phone: string
+  avatar_url?: string | null
   created_at?: string
 }
 

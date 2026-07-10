@@ -1,5 +1,5 @@
 import React, { useState } from 'react'
-import { View, TouchableOpacity, StyleSheet, Alert, Switch } from 'react-native'
+import { View, TouchableOpacity, StyleSheet, Alert } from 'react-native'
 import { Ionicons } from '@expo/vector-icons'
 import { Screen, Text, Card } from '../components/ui'
 import { useAuth } from '../context/AuthContext'
@@ -11,7 +11,6 @@ type IconName = keyof typeof Ionicons.glyphMap
 export default function SecurityScreen() {
   const { profile, role } = useAuth()
   const accent = roleAccent(role)
-  const [biometric, setBiometric] = useState(false)
   const [sending, setSending] = useState(false)
 
   const changePassword = async () => {
@@ -49,27 +48,6 @@ export default function SecurityScreen() {
           tint={accent}
           onPress={changePassword}
         />
-        <Divider />
-        <View style={styles.row}>
-          <View style={[styles.rowIcon, { backgroundColor: `${accent}1A` }]}>
-            <Ionicons name="finger-print-outline" size={20} color={accent} />
-          </View>
-          <View style={{ flex: 1 }}>
-            <Text variant="label">Biometric unlock</Text>
-            <Text variant="caption" muted>
-              Use fingerprint or face to open the app
-            </Text>
-          </View>
-          <Switch
-            value={biometric}
-            onValueChange={(v) => {
-              setBiometric(v)
-              if (v) Alert.alert('Coming soon', 'Biometric unlock will be available in a future update.')
-            }}
-            trackColor={{ true: accent, false: colors.gray200 }}
-            thumbColor={colors.white}
-          />
-        </View>
       </Card>
 
       <Text variant="label" muted style={[styles.section, { marginTop: spacing.lg }]}>

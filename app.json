@@ -1,6 +1,6 @@
 {
   "expo": {
-    "name": "MyCarePlus",
+    "name": "MyCare+",
     "slug": "MyCarePlus",
     "version": "1.0.0",
     "orientation": "portrait",
@@ -22,7 +22,13 @@
       "favicon": "./assets/favicon.png"
     },
     "plugins": [
-      "expo-secure-store"
+      "expo-secure-store",
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "MyCare+ needs access to your photos so you can set a product or profile picture."
+        }
+      ]
     ]
   }
 }

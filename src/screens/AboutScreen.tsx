@@ -1,5 +1,5 @@
 import React from 'react'
-import { View, Image, TouchableOpacity, StyleSheet, Linking } from 'react-native'
+import { View, TouchableOpacity, StyleSheet, Linking } from 'react-native'
 import { Ionicons } from '@expo/vector-icons'
 import { Screen, Text, Card } from '../components/ui'
 import { useAuth } from '../context/AuthContext'
@@ -17,7 +17,6 @@ export default function AboutScreen() {
   return (
     <Screen topInset={false}>
       <View style={styles.brand}>
-        <Image source={require('../../assets/icon.png')} style={styles.logo} />
         <Text variant="title" color={accent}>
           MyCare+
         </Text>
@@ -97,7 +96,6 @@ function Divider() {
 
 const styles = StyleSheet.create({
   brand: { alignItems: 'center', marginBottom: spacing.lg, gap: 4 },
-  logo: { width: 72, height: 72, borderRadius: 16, marginBottom: spacing.sm },
   row: {
     flexDirection: 'row',
     alignItems: 'center',

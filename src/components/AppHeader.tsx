@@ -1,5 +1,5 @@
 import React, { useState } from 'react'
-import { View, Image, TouchableOpacity, StyleSheet, Alert } from 'react-native'
+import { View, TouchableOpacity, StyleSheet, Alert } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { useNavigation } from '@react-navigation/native'
 import { Ionicons } from '@expo/vector-icons'
@@ -22,6 +22,8 @@ export default function AppHeader({ role, onNotificationsPress, onCartPress }: P
   const [cartVisible, setCartVisible] = useState(false)
 
   const accent = roleAccent(role)
+  // Admins manage the shop, they don't buy — so no cart for them.
+  const showCart = role !== 'admin'
 
   const handleNotifications =
     onNotificationsPress ?? (() => Alert.alert('Notifications', 'You have no new notifications.'))
@@ -29,9 +31,8 @@ export default function AppHeader({ role, onNotificationsPress, onCartPress }: P
 
   return (
     <View style={[styles.header, { paddingTop: insets.top + spacing.sm, borderBottomColor: colors.border }]}>
-      {/* Logo (left) */}
+      {/* Brand name (left) */}
       <View style={styles.brand}>
-        <Image source={require('../../assets/icon.png')} style={styles.logo} />
         <Text variant="heading" color={accent}>
           MyCare+
         </Text>
@@ -45,16 +46,18 @@ export default function AppHeader({ role, onNotificationsPress, onCartPress }: P
 
         <MessageButton accent={accent} />
 
-        <TouchableOpacity onPress={handleCart} style={styles.iconBtn} hitSlop={8}>
-          <Ionicons name="cart-outline" size={24} color={colors.gray700} />
-          {totalItems > 0 && (
-            <View style={[styles.badge, { backgroundColor: accent }]}>
-              <Text variant="caption" color={colors.textInverse} style={styles.badgeText}>
-                {totalItems > 99 ? '99+' : totalItems}
-              </Text>
-            </View>
-          )}
-        </TouchableOpacity>
+        {showCart && (
+          <TouchableOpacity onPress={handleCart} style={styles.iconBtn} hitSlop={8}>
+            <Ionicons name="cart-outline" size={24} color={colors.gray700} />
+            {totalItems > 0 && (
+              <View style={[styles.badge, { backgroundColor: accent }]}>
+                <Text variant="caption" color={colors.textInverse} style={styles.badgeText}>
+                  {totalItems > 99 ? '99+' : totalItems}
+                </Text>
+              </View>
+            )}
+          </TouchableOpacity>
+        )}
 
         <TouchableOpacity onPress={() => navigation.navigate('Account')} style={styles.iconBtn} hitSlop={8}>
           <Ionicons name="person-circle-outline" size={26} color={accent} />
@@ -78,7 +81,6 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
   },
   brand: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
-  logo: { width: 28, height: 28, borderRadius: 6 },
   actions: { flexDirection: 'row', alignItems: 'center', gap: spacing.lg },
   iconBtn: { padding: 2 },
   badge: {

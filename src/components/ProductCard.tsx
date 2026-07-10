@@ -1,5 +1,5 @@
 import React from 'react'
-import { View, TouchableOpacity, StyleSheet } from 'react-native'
+import { View, TouchableOpacity, StyleSheet, Image } from 'react-native'
 import { Ionicons } from '@expo/vector-icons'
 import { Text, Card } from './ui'
 import { colors, spacing, radius } from '../theme'
@@ -21,17 +21,22 @@ interface Props {
   price: number
   description?: string
   category?: string
+  image?: string | null
   accent?: string
   soft?: string
   onAdd: () => void
 }
 
-export default function ProductCard({ name, price, description, category, accent = colors.primary, soft = colors.gray100, onAdd }: Props) {
+export default function ProductCard({ name, price, description, category, image, accent = colors.primary, soft = colors.gray100, onAdd }: Props) {
   return (
     <Card style={styles.card}>
-      <View style={[styles.thumb, { backgroundColor: soft }]}>
-        <Text style={styles.emoji}>{categoryEmoji(category)}</Text>
-      </View>
+      {image ? (
+        <Image source={{ uri: image }} style={styles.thumb} />
+      ) : (
+        <View style={[styles.thumb, styles.thumbFallback, { backgroundColor: soft }]}>
+          <Text style={styles.emoji}>{categoryEmoji(category)}</Text>
+        </View>
+      )}
 
       <View style={styles.info}>
         <Text variant="label" numberOfLines={1}>
@@ -60,6 +65,8 @@ const styles = StyleSheet.create({
     width: 54,
     height: 54,
     borderRadius: radius.md,
+  },
+  thumbFallback: {
     alignItems: 'center',
     justifyContent: 'center',
   },

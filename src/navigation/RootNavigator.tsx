@@ -1,5 +1,5 @@
 import React from 'react'
-import { View, ActivityIndicator } from 'react-native'
+import { View, ActivityIndicator, Text } from 'react-native'
 import { createNativeStackNavigator } from '@react-navigation/native-stack'
 import { useAuth } from '../context/AuthContext'
 import { colors } from '../theme'
@@ -33,7 +33,10 @@ const Stack = createNativeStackNavigator<RootStackParamList>()
 function Splash() {
   return (
     <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: colors.background }}>
-      <ActivityIndicator size="large" color={colors.primary} />
+      <Text style={{ fontSize: 36, fontWeight: '700', color: colors.primary, letterSpacing: 0.5 }}>
+        MyCare+
+      </Text>
+      <ActivityIndicator size="small" color={colors.primary} style={{ marginTop: 20 }} />
     </View>
   )
 }

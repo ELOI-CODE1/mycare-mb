@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react'
-import { View, StyleSheet, ScrollView, Alert, Modal, TouchableOpacity } from 'react-native'
+import { View, StyleSheet, ScrollView, Alert, Modal, TouchableOpacity, Image, ActivityIndicator } from 'react-native'
 import { Ionicons } from '@expo/vector-icons'
 import { supabase } from '../lib/supabase'
+import { pickAndUploadImage } from '../lib/uploadImage'
 import AppHeader from '../components/AppHeader'
 import { Text, Card, Button, Input, Badge, Segmented, EmptyState } from '../components/ui'
 import { categoryEmoji } from '../components/ProductCard'
@@ -30,11 +31,14 @@ type Product = {
   category: string
   visible_to: string[]
   is_available: boolean
+  image_url?: string | null
 }
 
 const ACCENT = roleColors.admin.accent
 const SOFT = roleColors.admin.soft
 const STATUSES = ['pending', 'confirmed', 'shipped', 'delivered', 'cancelled']
+const CATEGORIES = ['pads', 'condoms', 'pain', 'hygiene', 'test']
+const AUDIENCE_TAGS = ['girl', 'boy', 'parent']
 
 export default function AdminDashboard() {
   const [activeTab, setActiveTab] = useState<'overview' | 'users' | 'orders' | 'products'>('overview')
@@ -46,7 +50,26 @@ export default function AdminDashboard() {
   const [productDescription, setProductDescription] = useState('')
   const [productPrice, setProductPrice] = useState('')
   const [productCategory, setProductCategory] = useState('')
-  const [productVisibleTo, setProductVisibleTo] = useState('')
+  const [productVisibleTo, setProductVisibleTo] = useState<string[]>([])
+  const [productImageUrl, setProductImageUrl] = useState<string | null>(null)
+  const [imageUploading, setImageUploading] = useState(false)
+  const [orderSearch, setOrderSearch] = useState('')
+  const [productSearch, setProductSearch] = useState('')
+
+  const toggleVisibleTo = (tag: string) =>
+    setProductVisibleTo(prev => (prev.includes(tag) ? prev.filter(t => t !== tag) : [...prev, tag]))
+
+  const handlePickProductImage = async () => {
+    try {
+      setImageUploading(true)
+      const url = await pickAndUploadImage('product-images', 'product')
+      if (url) setProductImageUrl(url)
+    } catch (e: any) {
+      Alert.alert('Upload failed', e?.message || 'Could not upload the image.')
+    } finally {
+      setImageUploading(false)
+    }
+  }
 
   useEffect(() => {
     loadOrders()
@@ -94,10 +117,17 @@ export default function AdminDashboard() {
 
   const saveProduct = async () => {
     if (!productName || !productPrice) {
-      Alert.alert('Error', 'Please fill required fields')
+      Alert.alert('Error', 'Please enter a product name and price.')
       return
     }
-    const visibleToArray = productVisibleTo.split(',').map(s => s.trim()).filter(Boolean)
+    if (!productCategory) {
+      Alert.alert('Error', 'Please choose a category.')
+      return
+    }
+    if (productVisibleTo.length === 0) {
+      Alert.alert('Error', 'Please choose who can see this product (at least one tag).')
+      return
+    }
     const priceNum = parseInt(productPrice)
 
     const payload = {
@@ -105,7 +135,8 @@ export default function AdminDashboard() {
       description: productDescription,
       price: priceNum,
       category: productCategory,
-      visible_to: visibleToArray,
+      visible_to: productVisibleTo,
+      image_url: productImageUrl,
     }
 
     const { error } = editingProduct
@@ -142,17 +173,39 @@ export default function AdminDashboard() {
       setProductDescription(product.description || '')
       setProductPrice(product.price.toString())
       setProductCategory(product.category)
-      setProductVisibleTo(product.visible_to?.join(', ') || '')
+      setProductVisibleTo(product.visible_to || [])
+      setProductImageUrl(product.image_url || null)
     } else {
       setEditingProduct(null)
       setProductName('')
       setProductDescription('')
       setProductPrice('')
       setProductCategory('')
-      setProductVisibleTo('')
+      setProductVisibleTo([])
+      setProductImageUrl(null)
     }
     setShowProductModal(true)
   }
+
+  // Client-side search filters.
+  const q = orderSearch.trim().toLowerCase()
+  const filteredOrders = q
+    ? orders.filter(o =>
+        String(o.id).includes(q) ||
+        (o.profiles?.email || '').toLowerCase().includes(q) ||
+        (o.products?.name || '').toLowerCase().includes(q) ||
+        (o.status || '').toLowerCase().includes(q),
+      )
+    : orders
+
+  const pq = productSearch.trim().toLowerCase()
+  const filteredProducts = pq
+    ? products.filter(p =>
+        p.name.toLowerCase().includes(pq) ||
+        (p.category || '').toLowerCase().includes(pq) ||
+        (p.description || '').toLowerCase().includes(pq),
+      )
+    : products
 
   return (
     <View style={styles.root}>
@@ -183,10 +236,20 @@ export default function AdminDashboard() {
 
         {/* ORDERS */}
         {activeTab === 'orders' && (
-          orders.length === 0 ? (
-            <EmptyState icon="receipt-outline" title="No orders found" />
-          ) : (
-            orders.map(order => (
+          <View>
+            {orders.length > 0 && (
+              <Input
+                placeholder="Search by order #, customer, product or status"
+                value={orderSearch}
+                onChangeText={setOrderSearch}
+              />
+            )}
+            {orders.length === 0 ? (
+              <EmptyState icon="receipt-outline" title="No orders found" />
+            ) : filteredOrders.length === 0 ? (
+              <EmptyState icon="search-outline" title="No matching orders" />
+            ) : (
+              filteredOrders.map(order => (
               <Card key={order.id}>
                 <View style={styles.rowBetween}>
                   <Text variant="label">Order #{order.id}</Text>
@@ -216,8 +279,9 @@ export default function AdminDashboard() {
                   })}
                 </View>
               </Card>
-            ))
-          )
+              ))
+            )}
+          </View>
         )}
 
         {/* PRODUCTS */}
@@ -229,18 +293,32 @@ export default function AdminDashboard() {
               onPress={() => openProductModal()}
               style={{ marginBottom: spacing.lg }}
             />
+            {products.length > 0 && (
+              <Input
+                placeholder="Search products by name or category"
+                value={productSearch}
+                onChangeText={setProductSearch}
+              />
+            )}
             {products.length === 0 ? (
               <EmptyState icon="cube-outline" title="No products found" />
+            ) : filteredProducts.length === 0 ? (
+              <EmptyState icon="search-outline" title="No matching products" />
             ) : (
-              products.map(product => (
+              filteredProducts.map(product => (
                 <Card key={product.id} style={styles.productCard}>
-                  <View style={[styles.thumb, { backgroundColor: SOFT }]}>
-                    <Text style={{ fontSize: 24 }}>{categoryEmoji(product.category)}</Text>
-                  </View>
+                  {product.image_url ? (
+                    <Image source={{ uri: product.image_url }} style={styles.thumb} />
+                  ) : (
+                    <View style={[styles.thumb, { backgroundColor: SOFT, alignItems: 'center', justifyContent: 'center' }]}>
+                      <Text style={{ fontSize: 24 }}>{categoryEmoji(product.category)}</Text>
+                    </View>
+                  )}
                   <View style={{ flex: 1 }}>
                     <Text variant="label">{product.name}</Text>
                     <Text variant="caption" muted numberOfLines={1}>{product.description}</Text>
                     <Text variant="label" color={ACCENT} style={{ marginTop: 2 }}>{product.price.toLocaleString()} RWF</Text>
+                    <Text variant="caption" muted style={{ textTransform: 'capitalize' }}>Category: {product.category || '—'}</Text>
                     <Text variant="caption" muted>Visible to: {product.visible_to?.join(', ') || '—'}</Text>
                     <View style={styles.productActions}>
                       <TouchableOpacity style={[styles.smallBtn, { backgroundColor: colors.blueSoft }]} onPress={() => openProductModal(product)}>
@@ -268,12 +346,68 @@ export default function AdminDashboard() {
               {editingProduct ? 'Edit Product' : 'Add Product'}
             </Text>
             <ScrollView>
+              <Text variant="label" style={styles.fieldLabel}>Product image</Text>
+              <TouchableOpacity style={styles.imagePicker} onPress={handlePickProductImage} disabled={imageUploading} activeOpacity={0.8}>
+                {imageUploading ? (
+                  <ActivityIndicator color={ACCENT} />
+                ) : productImageUrl ? (
+                  <Image source={{ uri: productImageUrl }} style={styles.imagePreview} />
+                ) : (
+                  <View style={{ alignItems: 'center' }}>
+                    <Ionicons name="camera-outline" size={28} color={colors.gray400} />
+                    <Text variant="caption" muted>Tap to add a photo</Text>
+                  </View>
+                )}
+              </TouchableOpacity>
+              {productImageUrl && !imageUploading && (
+                <TouchableOpacity onPress={() => setProductImageUrl(null)} style={{ marginBottom: spacing.md }}>
+                  <Text variant="caption" color={colors.danger} center>Remove photo</Text>
+                </TouchableOpacity>
+              )}
+
               <Input label="Name" placeholder="Product name" value={productName} onChangeText={setProductName} />
               <Input label="Description" placeholder="Short description" value={productDescription} onChangeText={setProductDescription} multiline />
               <Input label="Price (RWF)" placeholder="2500" value={productPrice} onChangeText={setProductPrice} keyboardType="numeric" />
-              <Input label="Category" placeholder="pads, condoms, pain, hygiene, test" value={productCategory} onChangeText={setProductCategory} />
-              <Input label="Visible to" placeholder="girl, boy, parent" value={productVisibleTo} onChangeText={setProductVisibleTo} />
-              <Button title="Save" accent={ACCENT} onPress={saveProduct} />
+
+              <Text variant="label" style={styles.fieldLabel}>Category</Text>
+              <View style={styles.tagRow}>
+                {CATEGORIES.map(cat => {
+                  const active = productCategory === cat
+                  return (
+                    <TouchableOpacity
+                      key={cat}
+                      onPress={() => setProductCategory(cat)}
+                      style={[styles.tag, active && { backgroundColor: ACCENT, borderColor: ACCENT }]}
+                    >
+                      <Text variant="caption" color={active ? colors.white : colors.gray700} style={{ textTransform: 'capitalize' }}>
+                        {cat}
+                      </Text>
+                    </TouchableOpacity>
+                  )
+                })}
+              </View>
+
+              <Text variant="label" style={styles.fieldLabel}>Visible to</Text>
+              <Text variant="caption" muted style={{ marginBottom: spacing.sm }}>Choose one or more. Selected tags are highlighted.</Text>
+              <View style={styles.tagRow}>
+                {AUDIENCE_TAGS.map(tag => {
+                  const active = productVisibleTo.includes(tag)
+                  return (
+                    <TouchableOpacity
+                      key={tag}
+                      onPress={() => toggleVisibleTo(tag)}
+                      style={[styles.tag, active && { backgroundColor: ACCENT, borderColor: ACCENT }]}
+                    >
+                      {active && <Ionicons name="checkmark" size={14} color={colors.white} style={{ marginRight: 4 }} />}
+                      <Text variant="caption" color={active ? colors.white : colors.gray700} style={{ textTransform: 'capitalize' }}>
+                        {tag}
+                      </Text>
+                    </TouchableOpacity>
+                  )
+                })}
+              </View>
+
+              <Button title="Save" accent={ACCENT} onPress={saveProduct} style={{ marginTop: spacing.lg }} />
               <Button title="Cancel" variant="secondary" onPress={() => setShowProductModal(false)} style={{ marginTop: spacing.sm }} />
             </ScrollView>
           </View>
@@ -296,8 +430,32 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: colors.border,
   },
+  fieldLabel: { color: colors.gray700, marginBottom: spacing.xs },
+  tagRow: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm, marginBottom: spacing.md },
+  tag: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: spacing.md,
+    paddingVertical: 8,
+    borderRadius: radius.pill,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
   productCard: { flexDirection: 'row', gap: spacing.md },
   thumb: { width: 48, height: 48, borderRadius: radius.md, alignItems: 'center', justifyContent: 'center' },
+  imagePicker: {
+    height: 140,
+    borderRadius: radius.md,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderStyle: 'dashed',
+    backgroundColor: colors.gray100,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: spacing.sm,
+    overflow: 'hidden',
+  },
+  imagePreview: { width: '100%', height: '100%' },
   productActions: { flexDirection: 'row', gap: spacing.sm, marginTop: spacing.sm },
   smallBtn: {
     flexDirection: 'row',
