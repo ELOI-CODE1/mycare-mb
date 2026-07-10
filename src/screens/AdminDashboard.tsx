@@ -55,6 +55,19 @@ export default function AdminDashboard() {
   const [imageUploading, setImageUploading] = useState(false)
   const [orderSearch, setOrderSearch] = useState('')
   const [productSearch, setProductSearch] = useState('')
+  const [statusFilter, setStatusFilter] = useState<string>('all')
+  const [selectedOrder, setSelectedOrder] = useState<Order | null>(null)
+  const [orderModalMode, setOrderModalMode] = useState<'manage' | 'detail' | null>(null)
+
+  const closeOrderModal = () => {
+    setSelectedOrder(null)
+    setOrderModalMode(null)
+  }
+
+  const handleChangeStatus = async (orderId: number, status: string) => {
+    await updateOrderStatus(orderId, status)
+    setSelectedOrder(prev => (prev ? { ...prev, status } : prev))
+  }
 
   const toggleVisibleTo = (tag: string) =>
     setProductVisibleTo(prev => (prev.includes(tag) ? prev.filter(t => t !== tag) : [...prev, tag]))
@@ -187,17 +200,18 @@ export default function AdminDashboard() {
     setShowProductModal(true)
   }
 
-  // Client-side search filters.
+  // Client-side search + status filters for orders.
   const q = orderSearch.trim().toLowerCase()
-  const filteredOrders = q
-    ? orders.filter(o =>
-        String(o.id).includes(q) ||
-        (o.profiles?.full_name || '').toLowerCase().includes(q) ||
-        (o.profiles?.email || '').toLowerCase().includes(q) ||
-        (o.products?.name || '').toLowerCase().includes(q) ||
-        (o.status || '').toLowerCase().includes(q),
-      )
-    : orders
+  const filteredOrders = orders
+    .filter(o => statusFilter === 'all' || (o.status || '').toLowerCase() === statusFilter)
+    .filter(o =>
+      !q ||
+      String(o.id).includes(q) ||
+      (o.profiles?.full_name || '').toLowerCase().includes(q) ||
+      (o.profiles?.email || '').toLowerCase().includes(q) ||
+      (o.products?.name || '').toLowerCase().includes(q) ||
+      (o.status || '').toLowerCase().includes(q),
+    )
 
   const pq = productSearch.trim().toLowerCase()
   const filteredProducts = pq
@@ -245,42 +259,58 @@ export default function AdminDashboard() {
                 onChangeText={setOrderSearch}
               />
             )}
+
+            {/* Status filter chips */}
+            {orders.length > 0 && (
+              <View style={styles.filterRow}>
+                {['all', ...STATUSES].map(s => {
+                  const active = statusFilter === s
+                  return (
+                    <TouchableOpacity
+                      key={s}
+                      onPress={() => setStatusFilter(s)}
+                      style={[styles.statusChip, active && { backgroundColor: ACCENT, borderColor: ACCENT }]}
+                    >
+                      <Text variant="caption" color={active ? colors.white : colors.gray700} style={{ textTransform: 'capitalize' }}>
+                        {s === 'all' ? 'All' : s}
+                      </Text>
+                    </TouchableOpacity>
+                  )
+                })}
+              </View>
+            )}
+
             {orders.length === 0 ? (
               <EmptyState icon="receipt-outline" title="No orders found" />
             ) : filteredOrders.length === 0 ? (
               <EmptyState icon="search-outline" title="No matching orders" />
             ) : (
               filteredOrders.map(order => (
-              <Card key={order.id}>
-                <View style={styles.rowBetween}>
-                  <Text variant="label">Order #{order.id}</Text>
-                  <Badge label={order.status} status={order.status} />
-                </View>
-                <View style={{ marginTop: spacing.sm, gap: 2 }}>
-                  <Text variant="caption" muted>Customer: {order.profiles?.full_name || 'Unknown'}</Text>
-                  <Text variant="caption" muted>Email: {order.profiles?.email || '—'}</Text>
-                  <Text variant="caption" muted>Product: {order.products?.name || 'Unknown'} × {order.quantity}</Text>
-                  <Text variant="caption" muted>Total: {order.total_price.toLocaleString()} RWF</Text>
-                  <Text variant="caption" muted>Address: {order.delivery_address || '—'}</Text>
-                </View>
-                <Text variant="caption" muted style={{ marginTop: spacing.md, marginBottom: spacing.xs }}>Update status</Text>
-                <View style={styles.statusRow}>
-                  {STATUSES.map(status => {
-                    const active = order.status === status
-                    return (
-                      <TouchableOpacity
-                        key={status}
-                        onPress={() => updateOrderStatus(order.id, status)}
-                        style={[styles.statusChip, active && { backgroundColor: ACCENT, borderColor: ACCENT }]}
-                      >
-                        <Text variant="caption" color={active ? colors.white : colors.gray700} style={{ textTransform: 'capitalize' }}>
-                          {status}
-                        </Text>
-                      </TouchableOpacity>
-                    )
-                  })}
-                </View>
-              </Card>
+                <Card key={order.id}>
+                  <View style={styles.rowBetween}>
+                    <View style={{ flex: 1, paddingRight: spacing.sm }}>
+                      <Text variant="label" numberOfLines={1}>{order.profiles?.full_name || 'Unknown'}</Text>
+                      <Text variant="caption" muted numberOfLines={1}>{order.products?.name || 'Unknown'}</Text>
+                    </View>
+                    <Badge label={order.status} status={order.status} />
+                  </View>
+                  <View style={styles.orderBtnRow}>
+                    <TouchableOpacity
+                      style={[styles.orderBtn, { backgroundColor: SOFT }]}
+                      onPress={() => { setSelectedOrder(order); setOrderModalMode('manage') }}
+                    >
+                      <Ionicons name="options-outline" size={16} color={ACCENT} />
+                      <Text variant="caption" color={ACCENT}>Manage</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      style={[styles.orderBtn, { backgroundColor: colors.gray100 }]}
+                      onPress={() => { setSelectedOrder(order); setOrderModalMode('detail') }}
+                    >
+                      <Ionicons name="eye-outline" size={16} color={colors.gray700} />
+                      <Text variant="caption" color={colors.gray700}>Detail</Text>
+                    </TouchableOpacity>
+                  </View>
+                </Card>
               ))
             )}
           </View>
@@ -415,6 +445,58 @@ export default function AdminDashboard() {
           </View>
         </View>
       </Modal>
+
+      {/* Order manage / detail modal */}
+      <Modal visible={!!selectedOrder} animationType="slide" transparent onRequestClose={closeOrderModal}>
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            {selectedOrder && orderModalMode === 'manage' && (
+              <>
+                <Text variant="heading" center style={{ marginBottom: spacing.md }}>
+                  Manage Order #{selectedOrder.id}
+                </Text>
+                <Text variant="caption" muted style={{ marginBottom: spacing.sm }}>Change status</Text>
+                <View style={styles.statusRow}>
+                  {STATUSES.map(status => {
+                    const active = selectedOrder.status === status
+                    return (
+                      <TouchableOpacity
+                        key={status}
+                        onPress={() => handleChangeStatus(selectedOrder.id, status)}
+                        style={[styles.statusChip, active && { backgroundColor: ACCENT, borderColor: ACCENT }]}
+                      >
+                        <Text variant="caption" color={active ? colors.white : colors.gray700} style={{ textTransform: 'capitalize' }}>
+                          {status}
+                        </Text>
+                      </TouchableOpacity>
+                    )
+                  })}
+                </View>
+                <Button title="Done" accent={ACCENT} onPress={closeOrderModal} style={{ marginTop: spacing.lg }} />
+              </>
+            )}
+
+            {selectedOrder && orderModalMode === 'detail' && (
+              <>
+                <View style={[styles.rowBetween, { marginBottom: spacing.md }]}>
+                  <Text variant="heading">Order #{selectedOrder.id}</Text>
+                  <Badge label={selectedOrder.status} status={selectedOrder.status} />
+                </View>
+                <View style={{ gap: 4 }}>
+                  <Text variant="caption" muted>Customer: {selectedOrder.profiles?.full_name || 'Unknown'}</Text>
+                  <Text variant="caption" muted>Email: {selectedOrder.profiles?.email || '—'}</Text>
+                  <Text variant="caption" muted>Product: {selectedOrder.products?.name || 'Unknown'} × {selectedOrder.quantity}</Text>
+                  <Text variant="caption" muted>Total: {selectedOrder.total_price.toLocaleString()} RWF</Text>
+                  <Text variant="caption" muted>Address: {selectedOrder.delivery_address || '—'}</Text>
+                  <Text variant="caption" muted style={{ textTransform: 'capitalize' }}>Status: {selectedOrder.status}</Text>
+                  <Text variant="caption" muted>Date: {new Date(selectedOrder.created_at).toLocaleString()}</Text>
+                </View>
+                <Button title="Close" variant="secondary" onPress={closeOrderModal} style={{ marginTop: spacing.lg }} />
+              </>
+            )}
+          </View>
+        </View>
+      </Modal>
     </View>
   )
 }
@@ -424,6 +506,17 @@ const styles = StyleSheet.create({
   container: { flex: 1 },
   content: { padding: spacing.lg, paddingBottom: spacing.xxl },
   rowBetween: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  filterRow: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm, marginBottom: spacing.md },
+  orderBtnRow: { flexDirection: 'row', gap: spacing.sm, marginTop: spacing.md },
+  orderBtn: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    paddingVertical: spacing.sm,
+    borderRadius: radius.sm,
+  },
   statusRow: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
   statusChip: {
     paddingHorizontal: spacing.md,
