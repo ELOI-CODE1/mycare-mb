@@ -19,7 +19,7 @@ type Order = {
   status: string
   delivery_address: string
   created_at: string
-  profiles?: { email: string }
+  profiles?: { email: string; full_name?: string }
   products?: { name: string }
 }
 
@@ -86,7 +86,7 @@ export default function AdminDashboard() {
     if (!ordersData || ordersData.length === 0) { setOrders([]); return }
 
     const userIds = [...new Set(ordersData.map(o => o.user_id))]
-    const { data: profilesData } = await supabase.from('profiles').select('id, email').in('id', userIds)
+    const { data: profilesData } = await supabase.from('profiles').select('id, email, full_name').in('id', userIds)
 
     const productIds = [...new Set(ordersData.map(o => o.product_id))]
     const { data: productsData } = await supabase.from('products').select('id, name').in('id', productIds)
@@ -192,6 +192,7 @@ export default function AdminDashboard() {
   const filteredOrders = q
     ? orders.filter(o =>
         String(o.id).includes(q) ||
+        (o.profiles?.full_name || '').toLowerCase().includes(q) ||
         (o.profiles?.email || '').toLowerCase().includes(q) ||
         (o.products?.name || '').toLowerCase().includes(q) ||
         (o.status || '').toLowerCase().includes(q),
@@ -256,7 +257,8 @@ export default function AdminDashboard() {
                   <Badge label={order.status} status={order.status} />
                 </View>
                 <View style={{ marginTop: spacing.sm, gap: 2 }}>
-                  <Text variant="caption" muted>Customer: {order.profiles?.email || 'Unknown'}</Text>
+                  <Text variant="caption" muted>Customer: {order.profiles?.full_name || 'Unknown'}</Text>
+                  <Text variant="caption" muted>Email: {order.profiles?.email || '—'}</Text>
                   <Text variant="caption" muted>Product: {order.products?.name || 'Unknown'} × {order.quantity}</Text>
                   <Text variant="caption" muted>Total: {order.total_price.toLocaleString()} RWF</Text>
                   <Text variant="caption" muted>Address: {order.delivery_address || '—'}</Text>
