@@ -1,6 +1,6 @@
 # MyCare+ &nbsp;<sub>(`MyCarePlus` repo)</sub>
 
-A React Native / Expo mobile app for **menstrual & reproductive health tracking** with a built-in **health shop**, **user⇄admin messaging**, and **role-based dashboards** (girl / boy / parent / admin). Backed by [Supabase](https://supabase.com) for auth and data.
+A React Native / Expo mobile app for **menstrual & reproductive health tracking** with a built-in **health shop**, **user⇄admin messaging**, and **role-based dashboards** (girl / boy / parent). Backed by [Supabase](https://supabase.com) for auth and data.
 
 ---
 
