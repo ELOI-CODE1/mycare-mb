@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react'
-import { View, ScrollView, TextInput, TouchableOpacity, StyleSheet, ActivityIndicator } from 'react-native'
+import { View, ScrollView, TextInput, TouchableOpacity, StyleSheet, ActivityIndicator, KeyboardAvoidingView, Platform } from 'react-native'
 import { Ionicons } from '@expo/vector-icons'
 import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../context/AuthContext'
@@ -18,6 +18,29 @@ export default function UserMessageThread({ accent }: { accent: string }) {
   useEffect(() => {
     load()
   }, [])
+
+  useEffect(() => {
+    if (!user?.id) return
+
+    const channel = supabase.channel(`messages-user-${user.id}`)
+    channel.on(
+      'postgres_changes',
+      {
+        event: '*',
+        schema: 'public',
+        table: 'messages',
+        filter: `user_id=eq.${user.id}`,
+      },
+      () => {
+        load()
+      },
+    )
+
+    channel.subscribe()
+    return () => {
+      supabase.removeChannel(channel)
+    }
+  }, [user?.id])
 
   const load = async () => {
     if (!user?.id) return
@@ -65,34 +88,53 @@ export default function UserMessageThread({ accent }: { accent: string }) {
         </ScrollView>
       )}
 
-      <View style={styles.composer}>
-        <TextInput
-          style={styles.input}
-          placeholder="Type a message…"
-          placeholderTextColor={colors.gray400}
-          value={text}
-          onChangeText={setText}
-          multiline
-        />
-        <TouchableOpacity style={[styles.sendBtn, { backgroundColor: accent }]} onPress={send} disabled={sending || !text.trim()}>
-          <Ionicons name="send" size={18} color={colors.white} />
-        </TouchableOpacity>
-      </View>
+      <KeyboardAvoidingView
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 24}
+        style={styles.composerContainer}
+      >
+        <View style={styles.composer}>
+          <TextInput
+            style={styles.input}
+            placeholder="Type a message…"
+            placeholderTextColor={colors.gray400}
+            value={text}
+            onChangeText={setText}
+            multiline
+            autoCapitalize="sentences"
+            textAlignVertical="top"
+          />
+          <TouchableOpacity style={[styles.sendBtn, { backgroundColor: accent }]} onPress={send} disabled={sending || !text.trim()}>
+            <Ionicons name="send" size={18} color={colors.white} />
+          </TouchableOpacity>
+        </View>
+      </KeyboardAvoidingView>
     </View>
   )
 }
 
 const styles = StyleSheet.create({
-  composer: { flexDirection: 'row', alignItems: 'flex-end', gap: spacing.sm, paddingTop: spacing.sm, borderTopWidth: 1, borderTopColor: colors.gray100 },
+  composerContainer: {
+    paddingHorizontal: spacing.md,
+    paddingTop: spacing.sm,
+    paddingBottom: spacing.sm,
+    borderTopWidth: 1,
+    borderTopColor: colors.gray100,
+    backgroundColor: colors.surface,
+  },
+  composer: { flexDirection: 'row', alignItems: 'flex-end' },
   input: {
     flex: 1,
-    maxHeight: 100,
+    minHeight: 44,
+    maxHeight: 120,
+    marginRight: spacing.sm,
     borderWidth: 1,
     borderColor: colors.border,
     borderRadius: radius.lg,
     paddingHorizontal: spacing.md,
     paddingVertical: spacing.sm,
     color: colors.text,
+    backgroundColor: colors.surface,
   },
   sendBtn: { width: 44, height: 44, borderRadius: radius.pill, alignItems: 'center', justifyContent: 'center' },
 })

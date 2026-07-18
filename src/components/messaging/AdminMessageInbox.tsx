@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react'
-import { View, ScrollView, TextInput, TouchableOpacity, StyleSheet, ActivityIndicator } from 'react-native'
+import { View, ScrollView, TextInput, TouchableOpacity, StyleSheet, ActivityIndicator, KeyboardAvoidingView, Platform } from 'react-native'
 import { Ionicons } from '@expo/vector-icons'
 import { supabase } from '../../lib/supabase'
 import { Text, Card, Badge, EmptyState } from '../ui'
@@ -27,6 +27,25 @@ export default function AdminMessageInbox({ accent }: { accent: string }) {
   useEffect(() => {
     loadThreads()
   }, [])
+
+  useEffect(() => {
+    const channel = supabase.channel('messages-admin')
+    channel.on(
+      'postgres_changes',
+      { event: '*', schema: 'public', table: 'messages' },
+      async () => {
+        await loadThreads()
+        if (active?.userId) {
+          await loadThreadMessages(active.userId)
+        }
+      },
+    )
+
+    channel.subscribe()
+    return () => {
+      supabase.removeChannel(channel)
+    }
+  }, [active?.userId])
 
   const loadThreads = async () => {
     const { data: msgs } = await supabase.from('messages').select('*').order('created_at', { ascending: false })
@@ -65,21 +84,25 @@ export default function AdminMessageInbox({ accent }: { accent: string }) {
     setLoading(false)
   }
 
-  const openThread = async (thread: Thread) => {
-    setActive(thread)
+  const loadThreadMessages = async (userId: string) => {
     const { data } = await supabase
       .from('messages')
       .select('*')
-      .eq('user_id', thread.userId)
+      .eq('user_id', userId)
       .order('created_at', { ascending: true })
     setMessages((data as Message[]) || [])
     await supabase
       .from('messages')
       .update({ is_read: true })
-      .eq('user_id', thread.userId)
+      .eq('user_id', userId)
       .eq('sender', 'user')
       .eq('is_read', false)
     setTimeout(() => scrollRef.current?.scrollToEnd({ animated: false }), 50)
+  }
+
+  const openThread = async (thread: Thread) => {
+    setActive(thread)
+    await loadThreadMessages(thread.userId)
   }
 
   const reply = async () => {
@@ -115,19 +138,27 @@ export default function AdminMessageInbox({ accent }: { accent: string }) {
           ))}
         </ScrollView>
 
-        <View style={styles.composer}>
-          <TextInput
-            style={styles.input}
-            placeholder="Reply…"
-            placeholderTextColor={colors.gray400}
-            value={text}
-            onChangeText={setText}
-            multiline
-          />
-          <TouchableOpacity style={[styles.sendBtn, { backgroundColor: accent }]} onPress={reply} disabled={sending || !text.trim()}>
-            <Ionicons name="send" size={18} color={colors.white} />
-          </TouchableOpacity>
-        </View>
+        <KeyboardAvoidingView
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+          keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 24}
+          style={styles.composerContainer}
+        >
+          <View style={styles.composer}>
+            <TextInput
+              style={styles.input}
+              placeholder="Reply…"
+              placeholderTextColor={colors.gray400}
+              value={text}
+              onChangeText={setText}
+              multiline
+              autoCapitalize="sentences"
+              textAlignVertical="top"
+            />
+            <TouchableOpacity style={[styles.sendBtn, { backgroundColor: accent }]} onPress={reply} disabled={sending || !text.trim()}>
+              <Ionicons name="send" size={18} color={colors.white} />
+            </TouchableOpacity>
+          </View>
+        </KeyboardAvoidingView>
       </View>
     )
   }
@@ -157,7 +188,15 @@ export default function AdminMessageInbox({ accent }: { accent: string }) {
 const styles = StyleSheet.create({
   backRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, paddingBottom: spacing.sm, borderBottomWidth: 1, borderBottomColor: colors.gray100 },
   threadTop: { flexDirection: 'row', alignItems: 'center' },
-  composer: { flexDirection: 'row', alignItems: 'flex-end', gap: spacing.sm, paddingTop: spacing.sm, borderTopWidth: 1, borderTopColor: colors.gray100 },
-  input: { flex: 1, maxHeight: 100, borderWidth: 1, borderColor: colors.border, borderRadius: radius.lg, paddingHorizontal: spacing.md, paddingVertical: spacing.sm, color: colors.text },
+  composerContainer: {
+    paddingHorizontal: spacing.md,
+    paddingTop: spacing.sm,
+    paddingBottom: spacing.sm,
+    borderTopWidth: 1,
+    borderTopColor: colors.gray100,
+    backgroundColor: colors.surface,
+  },
+  composer: { flexDirection: 'row', alignItems: 'flex-end' },
+  input: { flex: 1, minHeight: 44, maxHeight: 120, marginRight: spacing.sm, borderWidth: 1, borderColor: colors.border, borderRadius: radius.lg, paddingHorizontal: spacing.md, paddingVertical: spacing.sm, color: colors.text, backgroundColor: colors.surface },
   sendBtn: { width: 44, height: 44, borderRadius: radius.pill, alignItems: 'center', justifyContent: 'center' },
 })
