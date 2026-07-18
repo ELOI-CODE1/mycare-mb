@@ -109,6 +109,7 @@ export default function ParentDashboard() {
                   accent={ACCENT}
                   soft={SOFT}
                   onAdd={() => openProduct(p)}
+                  onPress={() => openProduct(p)}
                 />
               ))
             )}

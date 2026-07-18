@@ -183,6 +183,7 @@ export default function GirlDashboard() {
                   accent={ACCENT}
                   soft={SOFT}
                   onAdd={() => openProduct(p)}
+                  onPress={() => openProduct(p)}
                 />
               ))
             )}

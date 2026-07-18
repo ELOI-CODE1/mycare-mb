@@ -1,4 +1,4 @@
-import React, { useState } from 'react'
+import React, { useEffect, useState } from 'react'
 import { Modal, View, ScrollView, TouchableOpacity, StyleSheet, Alert } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
@@ -17,9 +17,16 @@ interface Props {
 export default function CartModal({ visible, onClose, accent = colors.primary }: Props) {
   const insets = useSafeAreaInsets()
   const { items, setQuantity, removeItem, totalPrice, totalItems, markCheckout } = useCart()
-  const { user } = useAuth()
+  const { user, profile } = useAuth()
   const [address, setAddress] = useState('')
+  const [contactPhone, setContactPhone] = useState('')
   const [placing, setPlacing] = useState(false)
+
+  useEffect(() => {
+    if (visible) {
+      setContactPhone(profile?.phone || '')
+    }
+  }, [visible, profile?.phone])
 
   const placeOrder = async () => {
     if (items.length === 0) return
@@ -32,6 +39,8 @@ export default function CartModal({ visible, onClose, accent = colors.primary }:
       return
     }
 
+    const normalizedPhone = contactPhone.trim() || profile?.phone || ''
+
     setPlacing(true)
     const rows = items.map((i) => ({
       user_id: user.id,
@@ -39,6 +48,7 @@ export default function CartModal({ visible, onClose, accent = colors.primary }:
       quantity: i.quantity,
       total_price: i.product.price * i.quantity,
       delivery_address: address.trim(),
+      contact_phone: normalizedPhone || null,
       status: 'pending',
     }))
 
@@ -122,6 +132,18 @@ export default function CartModal({ visible, onClose, accent = colors.primary }:
                 onChangeText={setAddress}
                 multiline
               />
+              <Text variant="label" style={{ marginTop: spacing.sm, marginBottom: spacing.sm }}>
+                Contact phone for order
+              </Text>
+              <Input
+                placeholder={profile?.phone || 'Use your account phone if left blank'}
+                value={contactPhone}
+                onChangeText={setContactPhone}
+                keyboardType="phone-pad"
+              />
+              <Text variant="caption" muted>
+                Leave blank to use the phone number from your account.
+              </Text>
             </ScrollView>
           )}
 

@@ -104,6 +104,7 @@ export default function BoyDashboard() {
                   accent={ACCENT}
                   soft={SOFT}
                   onAdd={() => openProduct(p)}
+                  onPress={() => openProduct(p)}
                 />
               ))
             )}
