@@ -179,7 +179,7 @@ const styles = StyleSheet.create({
     backgroundColor: colors.gray300,
   },
   dotActive: {
-    backgroundColor: accent,
+    backgroundColor: colors.primary,
   },
   detailsBox: {
     padding: spacing.md,

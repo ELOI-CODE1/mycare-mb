@@ -25,32 +25,35 @@ interface Props {
   accent?: string
   soft?: string
   onAdd: () => void
+  onPress?: () => void
 }
 
-export default function ProductCard({ name, price, description, category, image, accent = colors.primary, soft = colors.gray100, onAdd }: Props) {
+export default function ProductCard({ name, price, description, category, image, accent = colors.primary, soft = colors.gray100, onAdd, onPress }: Props) {
   return (
     <Card style={styles.card}>
-      {image ? (
-        <Image source={{ uri: image }} style={styles.thumb} />
-      ) : (
-        <View style={[styles.thumb, styles.thumbFallback, { backgroundColor: soft }]}>
-          <Text style={styles.emoji}>{categoryEmoji(category)}</Text>
-        </View>
-      )}
+      <TouchableOpacity style={styles.content} onPress={onPress} activeOpacity={0.85}>
+        {image ? (
+          <Image source={{ uri: image }} style={styles.thumb} />
+        ) : (
+          <View style={[styles.thumb, styles.thumbFallback, { backgroundColor: soft }]}> 
+            <Text style={styles.emoji}>{categoryEmoji(category)}</Text>
+          </View>
+        )}
 
-      <View style={styles.info}>
-        <Text variant="label" numberOfLines={1}>
-          {name}
-        </Text>
-        {description ? (
-          <Text variant="caption" muted numberOfLines={2} style={{ marginTop: 2 }}>
-            {description}
+        <View style={styles.info}>
+          <Text variant="label" numberOfLines={1}>
+            {name}
           </Text>
-        ) : null}
-        <Text variant="heading" color={accent} style={{ marginTop: spacing.xs }}>
-          {price.toLocaleString()} RWF
-        </Text>
-      </View>
+          {description ? (
+            <Text variant="caption" muted numberOfLines={2} style={{ marginTop: 2 }}>
+              {description}
+            </Text>
+          ) : null}
+          <Text variant="heading" color={accent} style={{ marginTop: spacing.xs }}>
+            {price.toLocaleString()} RWF
+          </Text>
+        </View>
+      </TouchableOpacity>
 
       <TouchableOpacity style={[styles.addBtn, { backgroundColor: accent }]} onPress={onAdd} activeOpacity={0.85}>
         <Ionicons name="add" size={20} color={colors.white} />
@@ -60,7 +63,8 @@ export default function ProductCard({ name, price, description, category, image,
 }
 
 const styles = StyleSheet.create({
-  card: { flexDirection: 'row', alignItems: 'center', gap: spacing.md },
+  card: { flexDirection: 'row', alignItems: 'center' },
+  content: { flexDirection: 'row', alignItems: 'center', flex: 1, marginRight: spacing.sm },
   thumb: {
     width: 54,
     height: 54,
