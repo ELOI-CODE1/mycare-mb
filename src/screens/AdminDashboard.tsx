@@ -34,6 +34,14 @@ type Product = {
   image_url?: string | null
 }
 
+function parseImageUrls(value?: string | null) {
+  if (!value) return []
+  return value
+    .split(/\|\||\n/)
+    .map((item) => item.trim())
+    .filter(Boolean)
+}
+
 const ACCENT = roleColors.admin.accent
 const SOFT = roleColors.admin.soft
 const STATUSES = ['pending', 'confirmed', 'shipped', 'delivered', 'cancelled']
@@ -76,12 +84,27 @@ export default function AdminDashboard() {
     try {
       setImageUploading(true)
       const url = await pickAndUploadImage('product-images', 'product')
-      if (url) setProductImageUrl(url)
+      if (url) {
+        setProductImageUrl((prev) => {
+          const existing = prev ? parseImageUrls(prev) : []
+          if (existing.includes(url)) return prev
+          return [...existing, url].join('||')
+        })
+      }
     } catch (e: any) {
       Alert.alert('Upload failed', e?.message || 'Could not upload the image.')
     } finally {
       setImageUploading(false)
     }
+  }
+
+  const removeLastProductImage = () => {
+    setProductImageUrl((prev) => {
+      const images = parseImageUrls(prev)
+      if (images.length === 0) return null
+      images.pop()
+      return images.length > 0 ? images.join('||') : null
+    })
   }
 
   useEffect(() => {
@@ -201,6 +224,8 @@ export default function AdminDashboard() {
   }
 
   // Client-side search + status filters for orders.
+  const productImages = parseImageUrls(productImageUrl)
+
   const q = orderSearch.trim().toLowerCase()
   const filteredOrders = orders
     .filter(o => statusFilter === 'all' || (o.status || '').toLowerCase() === statusFilter)
@@ -378,23 +403,32 @@ export default function AdminDashboard() {
               {editingProduct ? 'Edit Product' : 'Add Product'}
             </Text>
             <ScrollView>
-              <Text variant="label" style={styles.fieldLabel}>Product image</Text>
+              <Text variant="label" style={styles.fieldLabel}>Product photos</Text>
               <TouchableOpacity style={styles.imagePicker} onPress={handlePickProductImage} disabled={imageUploading} activeOpacity={0.8}>
                 {imageUploading ? (
                   <ActivityIndicator color={ACCENT} />
-                ) : productImageUrl ? (
-                  <Image source={{ uri: productImageUrl }} style={styles.imagePreview} />
+                ) : productImages.length > 0 ? (
+                  <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.imageGalleryRow}>
+                    {productImages.map((url, index) => (
+                      <Image key={`${url}-${index}`} source={{ uri: url }} style={styles.imagePreview} />
+                    ))}
+                  </ScrollView>
                 ) : (
                   <View style={{ alignItems: 'center' }}>
                     <Ionicons name="camera-outline" size={28} color={colors.gray400} />
-                    <Text variant="caption" muted>Tap to add a photo</Text>
+                    <Text variant="caption" muted>Tap to add photos</Text>
                   </View>
                 )}
               </TouchableOpacity>
-              {productImageUrl && !imageUploading && (
-                <TouchableOpacity onPress={() => setProductImageUrl(null)} style={{ marginBottom: spacing.md }}>
-                  <Text variant="caption" color={colors.danger} center>Remove photo</Text>
-                </TouchableOpacity>
+              {productImages.length > 0 && !imageUploading && (
+                <View style={styles.imageActions}>
+                  <TouchableOpacity onPress={handlePickProductImage}>
+                    <Text variant="caption" color={ACCENT} center>Add another photo</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity onPress={removeLastProductImage}>
+                    <Text variant="caption" color={colors.danger} center>Remove last photo</Text>
+                  </TouchableOpacity>
+                </View>
               )}
 
               <Input label="Name" placeholder="Product name" value={productName} onChangeText={setProductName} />
@@ -550,7 +584,16 @@ const styles = StyleSheet.create({
     marginBottom: spacing.sm,
     overflow: 'hidden',
   },
-  imagePreview: { width: '100%', height: '100%' },
+  imageGalleryRow: {
+    alignItems: 'center',
+    gap: spacing.sm,
+  },
+  imagePreview: { width: 160, height: 140, resizeMode: 'cover' },
+  imageActions: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginBottom: spacing.md,
+  },
   productActions: { flexDirection: 'row', gap: spacing.sm, marginTop: spacing.sm },
   smallBtn: {
     flexDirection: 'row',
