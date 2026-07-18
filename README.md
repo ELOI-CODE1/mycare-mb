@@ -209,7 +209,7 @@ The Supabase client lives in `src/lib/supabase.ts`. It uses `AsyncStorage` for s
 |-------|---------|
 | `profiles` | User profile + `role` + `status` (`active` / `suspended` / `deleted`) + `avatar_url` (profile photo) |
 | `products` | Shop catalog (`name, description, price, category, visible_to[], is_available, image_url`) |
-| `orders` | Placed orders (`product_id, quantity, total_price, delivery_address, status`) |
+| `orders` | Placed orders (`product_id, quantity, total_price, delivery_address, contact_phone, status`) |
 | `messages` | User⇄admin threaded messaging (`sender`, `is_read`) |
 | `admin_audit_log` | Admin action audit trail |
 
