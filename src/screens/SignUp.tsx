@@ -18,11 +18,10 @@ type Question = {
 const questions: Question[] = [
   {
     id: 'q1',
-    text: 'Who are you?',
+    text: 'How will you be using HerCare+',
     options: [
-      { value: 'myself', label: 'I am using this for myself' },
-      { value: 'child', label: 'I am a parent/guardian for a child' },
-      { value: 'both', label: 'Both for myself and my children' },
+      { value: 'myself', label: 'For my own health tracking' },
+      { value: 'child', label: 'As a parent/guardian managing my chidren' },
     ],
   },
   {
@@ -45,9 +44,9 @@ export default function SignUp({ navigation }: Props) {
   const [answers, setAnswers] = useState<Record<string, string>>({})
   const [loading, setLoading] = useState(false)
 
-  const determineRole = (a: Record<string, string>): string => {
-    if (a['q1'] === 'child' || a['q1'] === 'both') return 'parent'
-    if (a['q2'] === 'female') return 'girl'
+  const determineRole = (answers: Record<string, string>): string => {
+    if (answers['q1'] === 'child') return 'parent'
+    if (answers['q2'] === 'female') return 'girl'
     return 'boy'
   }
 
