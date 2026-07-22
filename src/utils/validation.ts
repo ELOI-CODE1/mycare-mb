@@ -63,3 +63,20 @@ export const validateStepOne = (data: SignupFormData): { isValid: boolean; error
 
 }
 
+export const validateStepTwo = (answers: AnswersData): {isValid: boolean; errors: FormErrors } => {
+    const errors: FormErrors = {}
+
+    if (!answers.q1) {
+        errors.q1 = 'Please select who you are registering for.'
+    }
+
+    if (!answers.q2) {
+        errors.q2 = 'Please select your gender.'
+    }
+
+    return{
+        isValid: Object.keys(errors).length === 0,
+        errors,
+    }
+}
+
