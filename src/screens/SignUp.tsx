@@ -1,10 +1,11 @@
 import React, { useState } from 'react'
-import { View, TouchableOpacity, StyleSheet, ScrollView, Alert } from 'react-native'
+import { View, TouchableOpacity, StyleSheet, ScrollView, Alert, ActivityIndicator } from 'react-native'
 import type { NativeStackScreenProps } from '@react-navigation/native-stack'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../context/AuthContext'
 import { Text, Input, Button } from '../components/ui'
 import { colors, spacing, radius } from '../theme'
+import { validateStepOne, validateStepTwo, FormErrors } from '../utils/validation'
 import type { RootStackParamList } from '../navigation/RootNavigator'
 
 type Props = NativeStackScreenProps<RootStackParamList, 'SignUp'>
@@ -37,165 +38,154 @@ const questions: Question[] = [
 export default function SignUp({ navigation }: Props) {
   const { signOut } = useAuth()
   const [step, setStep] = useState(0)
-  const [email, setEmail] = useState('')
+   
+  //form state
+  const [email, setEmail] = useState('') 
   const [password, setPassword] = useState('')
   const [fullName, setFullName] = useState('')
   const [phone, setPhone] = useState('')
   const [answers, setAnswers] = useState<Record<string, string>>({})
+
+  //Errors & Loading state
+  const [errors, setErrors] = useState<FormErrors>({})
   const [loading, setLoading] = useState(false)
 
-  const determineRole = (answers: Record<string, string>): string => {
+  //Handle step 1
+  const handleNextStep = () => {
+    const { isValid, errors: stepErrors } = validateStepOne({fullName, email, password, phone})
+    setErrors(stepErrors)
+
+    if (isValid){
+      setStep(1)
+    }
+  }
+
+  //Determine role
+  const determineRole = (answers: Record<string, string>): 'girl' | 'boy' | 'parent'=> {
     if (answers['q1'] === 'child') return 'parent'
     if (answers['q2'] === 'female') return 'girl'
     return 'boy'
   }
 
-  const createAccount = async (collectedAnswers: Record<string, string>) => {
-    setLoading(true)
-    const role = determineRole(collectedAnswers)
+  const handleSignup = async () => {
+    const { isValid, errors: stepErrors } = validateStepTwo(answers)
+    setErrors(stepErrors)
 
-    const { data, error } = await supabase.auth.signUp({
+    if (!isValid) return
+
+    setLoading(true)
+    const assignedRole = determineRole(answers)
+    
+    const { data, error} = await supabase.auth.signUp({
       email: email.trim(),
       password,
-      options: { data: { full_name: fullName, phone, role } },
-    })
+      options: {
+        data: {
+          full_name: fullName.trim(),
+          phone: phone.trim(),
+          gender:answers['q2'],
+          role: assignedRole,
+          
+        },
+      },
+    });
 
-    if (error) {
+    if(error){
       setLoading(false)
-      setStep(0)
-      Alert.alert('Error', error.message)
+      Alert.alert('Registration Failed', error.message)
       return
     }
 
     if (data.user) {
-      const { error: profileError } = await supabase.from('profiles').insert({
+      const {error: profileError} = await supabase.from('profiles').insert({
         id: data.user.id,
         email: email.trim(),
-        full_name: fullName,
-        role,
-        phone,
+        full_name: fullName.trim(),
+        phone: phone.trim(),
+        gender: answers['q2'],
+        role: assignedRole
+
       })
+
       if (profileError) {
-        console.warn('Profile insert error:', profileError.message)
+        console.warn('Profile DB Error:', profileError.message)
       }
     }
 
-    // Sign out so the user logs in explicitly (and the profile is guaranteed
-    // to exist before the role-based dashboard loads).
     await signOut()
     setLoading(false)
-    Alert.alert('Success', 'Account created! Please login.')
+    Alert.alert('Success', 'Account created successfully! Please log in.')
     navigation.navigate('Login')
   }
 
-  const handleAnswer = (questionId: string, value: string) => {
-    const newAnswers = { ...answers, [questionId]: value }
-    setAnswers(newAnswers)
-    const nextStep = step + 1
-    if (nextStep > questions.length) {
-      createAccount(newAnswers)
-    } else {
-      setStep(nextStep)
-    }
-  }
-
-  const goBack = () => {
-    if (step > 0) setStep(step - 1)
-    else navigation.goBack()
-  }
-
-  // Step 0: account details
-  if (step === 0) {
-    return (
+  //user credentials
+  if (step === 0){
+    return(
       <ScrollView style={styles.container} contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
-        <Text variant="title" center style={{ marginBottom: spacing.xl }}>
+        <Text variant='title' center style={{ marginBottom: spacing.lg}}>
           Create Account
         </Text>
-
-        <Input label="Full Name" placeholder="Jane Doe" value={fullName} onChangeText={setFullName} />
-        <Input
-          label="Email"
-          placeholder="you@example.com"
-          value={email}
-          onChangeText={setEmail}
-          autoCapitalize="none"
-          keyboardType="email-address"
-        />
-        <Input label="Password" placeholder="••••••••" value={password} onChangeText={setPassword} secureTextEntry />
-        <Input
-          label="Phone Number"
-          placeholder="0788xxxxxx"
-          value={phone}
-          onChangeText={setPhone}
-          keyboardType="phone-pad"
-        />
-
-        <Button
-          title="Continue"
-          onPress={() => {
-            if (!fullName || !email || !password || !phone) {
-              Alert.alert('Error', 'Please fill all fields')
-              return
-            }
-            setStep(1)
+        <View style={styles.inputGroup}>
+          <Input
+          label='Full Name'
+          placeholder='Jane Doe'
+          value={fullName}
+          onChangeText={(val) => {
+            setFullName(val)
+            if (errors.fullName) setErrors((prev) => ({ ...prev, fullName: undefined}))
           }}
-        />
-        <TouchableOpacity onPress={goBack} style={styles.backButton}>
-          <Text muted>Back to Login</Text>
-        </TouchableOpacity>
+          />
+          {errors.fullName && <Text style={styles.errorText}>{errors.fullName}</Text>}
+        </View>
+
+        <View style={styles.inputGroup}>
+          <Input
+          label='Email'
+          placeholder='you@example.com'
+          value={email}
+          onChangeText={(val) => {
+            setEmail(val)
+            if (errors.email) setErrors((prev) => ({...prev, email: undefined}))
+          }}
+          autoCapitalize='none'
+          keyboardType='email-address'
+          />
+          {errors.email && <Text style={styles.errorText}>{errors.email}</Text>}
+        </View>
+        
+        <View style={styles.inputGroup}>
+          <Input 
+          label='Password'
+          placeholder='........'
+          value={password}
+          onChangeText={(val) => {
+            setPassword(val)
+            if (errors.password) setErrors((prev) =>({ ...prev, password: undefined}))
+          }}
+          secureTextEntry
+          />
+          {errors.password && <Text style={styles.errorText}>{errors.password}</Text>} 
+        </View>
+
+        <View style={styles.inputGroup}>
+          <Input
+            label="Phone Number"
+            placeholder="07xxxxxxxx"
+            value={phone}
+            onChangeText={(val) => {
+              setPhone(val)
+              if (errors.phone) setErrors((prev) => ({ ...prev, phone: undefined }))
+            }}
+            keyboardType="phone-pad"
+          />
+          {errors.phone && <Text style={styles.errorText}>{errors.phone}</Text>}
+        </View>
       </ScrollView>
     )
   }
-
-  const currentQuestion = questions[step - 1]
-
-  if (currentQuestion) {
-    return (
-      <ScrollView style={styles.container} contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
-        <Text variant="heading" center style={{ marginBottom: spacing.xl }}>
-          {currentQuestion.text}
-        </Text>
-
-        {currentQuestion.options.map((option) => (
-          <TouchableOpacity
-            key={option.value}
-            style={styles.optionButton}
-            onPress={() => handleAnswer(currentQuestion.id, option.value)}
-          >
-            <Text center>{option.label}</Text>
-          </TouchableOpacity>
-        ))}
-
-        <TouchableOpacity onPress={goBack} style={styles.backButton}>
-          <Text muted>Back</Text>
-        </TouchableOpacity>
-      </ScrollView>
-    )
-  }
-
-  // Creating-account state
-  return (
-    <View style={[styles.container, styles.content, { justifyContent: 'center' }]}>
-      <Text variant="title" center>
-        Creating Account...
-      </Text>
-      <Text muted center>
-        Please wait
-      </Text>
-    </View>
-  )
+    
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: colors.surface },
-  content: { padding: spacing.lg, paddingTop: spacing.xxl },
-  optionButton: {
-    backgroundColor: colors.gray100,
-    padding: spacing.xl,
-    borderRadius: radius.md,
-    marginBottom: spacing.md,
-    borderWidth: 1,
-    borderColor: colors.border,
-  },
-  backButton: { marginTop: spacing.xl, alignItems: 'center' },
+
 })
