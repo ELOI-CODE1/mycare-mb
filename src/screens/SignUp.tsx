@@ -186,6 +186,26 @@ export default function SignUp({ navigation }: Props) {
     )
   }
   //step 1. Quetionaire
+  if (step === 1 && !loading) {
+    return(
+      <ScrollView style={styles.container} contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
+        <Text variant="heading" center style={{ marginBottom: spacing.md}}>
+          Tell Us About Yourself
+        </Text>
+
+        {
+          questions.map((q) =>{
+            const hasError = q.id === 'q1' ? errors.q1 : errors.q2
+            return (
+              <View key>
+
+              </View>
+            )
+          })
+        }
+      </ScrollView>
+    )
+  }
     
 }
 
