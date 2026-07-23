@@ -118,7 +118,7 @@ export default function SignUp({ navigation }: Props) {
     navigation.navigate('Login')
   }
 
-  //user credentials
+  //step 0. user credentials
   if (step === 0){
     return(
       <ScrollView style={styles.container} contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
@@ -180,9 +180,12 @@ export default function SignUp({ navigation }: Props) {
           />
           {errors.phone && <Text style={styles.errorText}>{errors.phone}</Text>}
         </View>
+
+        <Button title='Continue' onPress={handleNextStep} style={{marginTop: spacing.md}}/>
       </ScrollView>
     )
   }
+  //step 1. Quetionaire
     
 }
 
