@@ -192,7 +192,7 @@ export default function SignUp({ navigation }: Props) {
           const hasError = q.id === 'q1' ? errors.q1 : errors.q2
           return (
             <View key={q.id} style={styles.questionSection}>
-              <Text variant="subtitle" style={styles.questionText}>
+              <Text variant="heading" style={styles.questionText}>
                 {q.text}
               </Text>
 
