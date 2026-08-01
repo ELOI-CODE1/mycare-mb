@@ -3,7 +3,7 @@ import { View, TouchableOpacity, StyleSheet, ScrollView, Alert, ActivityIndicato
 import type { NativeStackScreenProps } from '@react-navigation/native-stack'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../context/AuthContext'
-import { Text, Input, Button } from '../components/ui'
+import { Text, Input, Button, Card, Screen } from '../components/ui'
 import { colors, spacing, radius } from '../theme'
 import { validateStepOne, validateStepTwo, FormErrors } from '../utils/validation'
 import type { RootStackParamList } from '../navigation/RootNavigator'
@@ -132,121 +132,135 @@ export default function SignUp({ navigation }: Props) {
     navigation.navigate('Login')
   }
 
-  // Step 0: User Credentials
+  // Step 0: User Credentials (card layout)
   if (step === 0) {
     return (
-      <ScrollView style={styles.container} contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
-        <Text variant="title" center style={{ marginBottom: spacing.lg }}>
-          Create Account
-        </Text>
-
-        <View style={styles.inputGroup}>
-          <Input
-            label="Full Name"
-            placeholder="Jane Doe"
-            value={fullName}
-            onChangeText={(val) => {
-              setFullName(val)
-              if (errors.fullName) setErrors((prev) => ({ ...prev, fullName: undefined }))
-            }}
-          />
-          {errors.fullName && <Text style={styles.errorText}>{errors.fullName}</Text>}
+      <Screen scroll padded={false} background={colors.background}>
+        <View style={styles.topHeader}>
+          <Text variant="title" style={styles.topTitle}>
+            Create Account
+          </Text>
+          <Text variant="caption" muted style={styles.topSubtitle}>
+            Register your account today using a valid email and password.
+          </Text>
         </View>
 
-        <View style={styles.inputGroup}>
-          <Input
-            label="Email"
-            placeholder="you@example.com"
-            value={email}
-            onChangeText={(val) => {
-              setEmail(val)
-              if (errors.email) setErrors((prev) => ({ ...prev, email: undefined }))
-            }}
-            autoCapitalize="none"
-            keyboardType="email-address"
-          />
-          {errors.email && <Text style={styles.errorText}>{errors.email}</Text>}
-        </View>
+        <Card style={styles.card}>
+          <View style={styles.inputGroup}>
+            <Input
+              label="Full Name"
+              placeholder="Jane Doe"
+              value={fullName}
+              onChangeText={(val) => {
+                setFullName(val)
+                if (errors.fullName) setErrors((prev) => ({ ...prev, fullName: undefined }))
+              }}
+            />
+            {errors.fullName && <Text style={styles.errorText}>{errors.fullName}</Text>}
+          </View>
 
-        <View style={styles.inputGroup}>
-          <Input
-            label="Password"
-            placeholder="••••••••"
-            value={password}
-            onChangeText={(val) => {
-              setPassword(val)
-              if (errors.password) setErrors((prev) => ({ ...prev, password: undefined }))
-            }}
-            secureTextEntry
-          />
-          {errors.password && <Text style={styles.errorText}>{errors.password}</Text>}
-        </View>
+          <View style={styles.inputGroup}>
+            <Input
+              label="Email"
+              placeholder="you@example.com"
+              value={email}
+              onChangeText={(val) => {
+                setEmail(val)
+                if (errors.email) setErrors((prev) => ({ ...prev, email: undefined }))
+              }}
+              autoCapitalize="none"
+              keyboardType="email-address"
+            />
+            {errors.email && <Text style={styles.errorText}>{errors.email}</Text>}
+          </View>
 
-        <View style={styles.inputGroup}>
-          <Input
-            label="Phone Number"
-            placeholder="0788123456"
-            value={phone}
-            onChangeText={(val) => {
-              setPhone(val)
-              if (errors.phone) setErrors((prev) => ({ ...prev, phone: undefined }))
-            }}
-            keyboardType="phone-pad"
-          />
-          {errors.phone && <Text style={styles.errorText}>{errors.phone}</Text>}
-        </View>
+          <View style={styles.inputGroup}>
+            <Input
+              label="Password"
+              placeholder="••••••••"
+              value={password}
+              onChangeText={(val) => {
+                setPassword(val)
+                if (errors.password) setErrors((prev) => ({ ...prev, password: undefined }))
+              }}
+              secureTextEntry
+            />
+            {errors.password && <Text style={styles.errorText}>{errors.password}</Text>}
 
-        <Button title="Continue" onPress={handleNextStep} style={{ marginTop: spacing.md }} />
-      </ScrollView>
+            {/* Forgot password moved to Login screen */}
+          </View>
+
+          <View style={styles.inputGroup}>
+            <Input
+              label="Phone Number"
+              placeholder="0788123456"
+              value={phone}
+              onChangeText={(val) => {
+                setPhone(val)
+                if (errors.phone) setErrors((prev) => ({ ...prev, phone: undefined }))
+              }}
+              keyboardType="phone-pad"
+            />
+            {errors.phone && <Text style={styles.errorText}>{errors.phone}</Text>}
+          </View>
+
+          <Button title="Continue" onPress={handleNextStep} style={{ marginTop: spacing.md }} />
+        </Card>
+      </Screen>
     )
   }
 
   // Step 1: Questionnaire
   if (step === 1 && !loading) {
     return (
-      <ScrollView style={styles.container} contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
-        <Text variant="heading" center style={{ marginBottom: spacing.md }}>
-          Tell Us About Yourself
-        </Text>
+      <Screen scroll padded={false} background={colors.background}>
+        <View style={styles.topHeaderSmall}>
+          <Text variant="heading">Tell Us About Yourself</Text>
+          <Text variant="caption" muted style={{ marginTop: spacing.xs }}>
+            A few quick questions to tailor your experience.
+          </Text>
+        </View>
 
-        {questions.map((q) => {
-          const hasError = q.id === 'q1' ? errors.q1 : errors.q2
-          return (
-            <View key={q.id} style={styles.questionSection}>
-              <Text variant="heading" style={styles.questionText}>
-                {q.text}
-              </Text>
+        <Card style={styles.card}>
+          {questions.map((q) => {
+            const hasError = q.id === 'q1' ? errors.q1 : errors.q2
+            return (
+              <View key={q.id} style={styles.questionSection}>
+                <Text variant="heading" style={styles.questionText}>
+                  {q.text}
+                </Text>
 
-              {q.options.map((opt) => {
-                const isSelected = answers[q.id] === opt.value
-                return (
-                  <TouchableOpacity
-                    key={opt.value}
-                    style={[styles.optionCard, isSelected && styles.optionCardSelected]}
-                    onPress={() => {
-                      setAnswers((prev) => ({ ...prev, [q.id]: opt.value }))
-                      setErrors((prev) => ({ ...prev, [q.id]: undefined }))
-                    }}
-                  >
-                    <View style={[styles.radio, isSelected && styles.radioSelected]}>
-                      {isSelected && <View style={styles.radioInner} />}
-                    </View>
-                    <Text style={styles.optionLabel}>{opt.label}</Text>
-                  </TouchableOpacity>
-                )
-              })}
+                {q.options.map((opt) => {
+                  const isSelected = answers[q.id] === opt.value
+                  return (
+                    <TouchableOpacity
+                      key={opt.value}
+                      style={[styles.optionCard, isSelected && styles.optionCardSelected]}
+                      onPress={() => {
+                        setAnswers((prev) => ({ ...prev, [q.id]: opt.value }))
+                        setErrors((prev) => ({ ...prev, [q.id]: undefined }))
+                      }}
+                    >
+                      <View style={[styles.radio, isSelected && styles.radioSelected]}>
+                        {isSelected && <View style={styles.radioInner} />}
+                      </View>
+                      <Text style={styles.optionLabel}>{opt.label}</Text>
+                    </TouchableOpacity>
+                  )
+                })}
 
-              {hasError && <Text style={styles.errorText}>{hasError}</Text>}
-            </View>
-          )
-        })}
+                {hasError && <Text style={styles.errorText}>{hasError}</Text>}
+              </View>
+            )
+          })}
 
-        <Button title="Complete Registration" onPress={handleSignUp} style={{ marginTop: spacing.lg }} />
+          <Button title="Complete Registration" onPress={handleSignUp} style={{ marginTop: spacing.lg }} />
 
-        <TouchableOpacity onPress={() => setStep(0)} style={styles.backButton}>
-          <Text muted>Back</Text>
-        </TouchableOpacity>
-      </ScrollView>
+          <TouchableOpacity onPress={() => setStep(0)} style={styles.backButton}>
+            <Text muted>Back</Text>
+          </TouchableOpacity>
+        </Card>
+      </Screen>
     )
   }
 
@@ -263,6 +277,8 @@ export default function SignUp({ navigation }: Props) {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.surface },
   content: { padding: spacing.lg, paddingTop: spacing.xxl },
+  header: { marginBottom: spacing.lg },
+  subtitle: { maxWidth: 360, alignSelf: 'center' },
   inputGroup: { marginBottom: spacing.sm },
   errorText: {
     color: '#DC2626',
@@ -300,4 +316,10 @@ const styles = StyleSheet.create({
   radioSelected: { borderColor: colors.primary },
   radioInner: { width: 10, height: 10, borderRadius: 5, backgroundColor: colors.primary },
   backButton: { marginTop: spacing.xl, alignItems: 'center' },
+  // forgot link intentionally omitted here (present on Login)
+  topHeader: { marginTop: spacing.xl, marginBottom: spacing.md, paddingHorizontal: spacing.lg },
+  topTitle: { textAlign: 'center', color: colors.primary },
+  topSubtitle: { textAlign: 'center' },
+  topHeaderSmall: { marginBottom: spacing.md, paddingHorizontal: spacing.lg },
+  card: { marginHorizontal: spacing.lg },
 })

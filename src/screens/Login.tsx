@@ -2,6 +2,7 @@ import React, { useState } from 'react'
 import { View, Alert, TouchableOpacity } from 'react-native'
 import type { NativeStackScreenProps } from '@react-navigation/native-stack'
 import { Screen, Text, Input, Button } from '../components/ui'
+import { supabase } from '../lib/supabase'
 import { useAuth } from '../context/AuthContext'
 import { colors, spacing } from '../theme'
 import type { RootStackParamList } from '../navigation/RootNavigator'
@@ -53,6 +54,26 @@ export default function Login({ navigation }: Props) {
           onChangeText={setPassword}
           secureTextEntry
         />
+
+        <TouchableOpacity
+          onPress={() => {
+            const target = email.trim()
+            if (!target) return Alert.alert('Enter email', 'Please enter your email to receive a reset link.')
+            Alert.alert('Reset password', `Send a password reset link to ${target}?`, [
+              { text: 'Cancel', style: 'cancel' },
+              {
+                text: 'Send',
+                onPress: async () => {
+                  const { error } = await supabase.auth.resetPasswordForEmail(target)
+                  Alert.alert(error ? 'Error' : 'Email sent', error ? error.message : 'Check your inbox for the reset link.')
+                },
+              },
+            ])
+          }}
+          style={{ alignSelf: 'flex-end', marginTop: spacing.xs, marginBottom: spacing.md }}
+        >
+          <Text style={{ color: colors.primary, fontWeight: '600' }}>Forgot password?</Text>
+        </TouchableOpacity>
 
         <Button title="Login" onPress={handleLogin} loading={loading} />
 
