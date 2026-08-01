@@ -56,20 +56,7 @@ export default function Login({ navigation }: Props) {
         />
 
         <TouchableOpacity
-          onPress={() => {
-            const target = email.trim()
-            if (!target) return Alert.alert('Enter email', 'Please enter your email to receive a reset link.')
-            Alert.alert('Reset password', `Send a password reset link to ${target}?`, [
-              { text: 'Cancel', style: 'cancel' },
-              {
-                text: 'Send',
-                onPress: async () => {
-                  const { error } = await supabase.auth.resetPasswordForEmail(target)
-                  Alert.alert(error ? 'Error' : 'Email sent', error ? error.message : 'Check your inbox for the reset link.')
-                },
-              },
-            ])
-          }}
+          onPress={() => navigation.navigate('ResetPassword')}
           style={{ alignSelf: 'flex-end', marginTop: spacing.xs, marginBottom: spacing.md }}
         >
           <Text style={{ color: colors.primary, fontWeight: '600' }}>Forgot password?</Text>

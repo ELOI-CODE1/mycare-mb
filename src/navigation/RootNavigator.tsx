@@ -6,6 +6,7 @@ import { colors } from '../theme'
 
 import Login from '../screens/Login'
 import SignUp from '../screens/SignUp'
+import ResetPassword from '../screens/ResetPassword'
 import GirlDashboard from '../screens/GirlDashboard'
 import BoyDashboard from '../screens/BoyDashboard'
 import ParentDashboard from '../screens/ParentDashboard'
@@ -20,6 +21,7 @@ import AboutScreen from '../screens/AboutScreen'
 export type RootStackParamList = {
   Login: undefined
   SignUp: undefined
+  ResetPassword: undefined
   Home: undefined
   Account: undefined
   Profile: undefined
@@ -71,6 +73,7 @@ export default function RootNavigator() {
         <>
           <Stack.Screen name="Login" component={Login} />
           <Stack.Screen name="SignUp" component={SignUp} />
+          <Stack.Screen name="ResetPassword" component={ResetPassword} />
         </>
       ) : (
         <>
