@@ -36,6 +36,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [profile, setProfile] = useState<Profile | null>(null)
 
   const user = session?.user ?? null
+  const metadataRole = typeof user?.user_metadata?.role === 'string' ? user.user_metadata.role : null
 
   const fetchProfile = useCallback(async (userId: string) => {
     const { data, error } = await supabase
@@ -113,7 +114,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     session,
     user,
     profile,
-    role: profile?.role ?? null,
+    role: profile?.role ?? metadataRole ?? null,
     signIn,
     signOut,
     refreshProfile,

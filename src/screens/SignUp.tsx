@@ -91,17 +91,38 @@ export default function SignUp({ navigation }: Props) {
     }
 
     if (data.user) {
-      const { error: profileError } = await supabase.from('profiles').insert({
+      const profilePayload = {
         id: data.user.id,
         email: email.trim(),
         full_name: fullName.trim(),
         phone: phone.trim(),
         gender: answers['q2'],
         role: assignedRole,
-      })
+      }
+
+      const { error: profileError } = await supabase
+        .from('profiles')
+        .upsert(profilePayload, { onConflict: 'id' })
 
       if (profileError) {
         console.warn('Profile DB Error:', profileError.message)
+      }
+
+      try {
+        const { error: metadataError } = await supabase.auth.updateUser({
+          data: {
+            full_name: fullName.trim(),
+            phone: phone.trim(),
+            gender: answers['q2'],
+            role: assignedRole,
+          },
+        })
+
+        if (metadataError) {
+          console.warn('Auth metadata update error:', metadataError.message)
+        }
+      } catch (metadataException) {
+        console.warn('Auth metadata update exception:', metadataException)
       }
     }
 
