@@ -5,7 +5,7 @@ import AddToCartModal from '../components/AddToCartModal';
 import AppHeader from '../components/AppHeader';
 import ProductCard from '../components/ProductCard';
 import OrderCard from '../components/OrderCard';
-import { Text, Input, Segmented, EmptyState } from '../components/ui';
+import { Text, Card, Button, Input, Segmented, EmptyState } from '../components/ui';
 import { useCart } from '../context/CartContext';
 import { useAuth } from '../context/AuthContext';
 import { colors, spacing, roleColors } from '../theme';
@@ -73,8 +73,45 @@ export default function BoyDashboard() {
     <View style={styles.root}>
       <AppHeader role="boy" />
       <ScrollView style={styles.container} contentContainerStyle={styles.content}>
-        <Text variant="title">Hello, {firstName}</Text>
-        <Text muted style={{ marginBottom: spacing.lg }}>Your health, handled discreetly.</Text>
+        <Card style={[styles.headerCard, { backgroundColor: SOFT }]}> 
+          <View style={styles.headerTopRow}>
+            <View>
+              <Text variant="caption" color={ACCENT} style={styles.heroLabel}>Dashboard</Text>
+              <Text variant="heading">Wellness essentials</Text>
+            </View>
+            <View style={styles.statusChip}>
+              <Text variant="caption" color={ACCENT}>Ready</Text>
+            </View>
+          </View>
+          <View style={styles.headerInfoRow}>
+            <View style={styles.infoCard}>
+              <Text variant="caption" muted>Items in cart</Text>
+              <Text variant="heading">{checkoutCount}</Text>
+            </View>
+            <View style={styles.infoCard}>
+              <Text variant="caption" muted>Recent orders</Text>
+              <Text variant="heading">{orders.length}</Text>
+            </View>
+          </View>
+          <Text muted style={{ marginTop: spacing.sm, lineHeight: 22 }}>
+            Browse trusted items and manage your orders from one clear dashboard.
+          </Text>
+        </Card>
+
+        <Card style={[styles.hero, { backgroundColor: SOFT }]}> 
+          <View style={styles.heroTopRow}>
+            <Text variant="caption" color={ACCENT} style={styles.heroLabel}>Top picks</Text>
+            <Text variant="caption" muted>Built for your needs</Text>
+          </View>
+          <Text variant="title" color={ACCENT}>Shop essentials</Text>
+          <Text muted style={{ marginTop: spacing.sm, lineHeight: 22 }}>
+            Find quality wellness supplies, discreetly selected for you.
+          </Text>
+          <View style={styles.heroActions}>
+            <Button title="Shop now" accent={ACCENT} onPress={() => setActiveTab('shop')} style={{ marginRight: spacing.sm, flex: 1 }} />
+            <Button title="My orders" accent={ACCENT} variant="secondary" onPress={() => setActiveTab('orders')} style={{ flex: 1 }} />
+          </View>
+        </Card>
 
         <Segmented
           accent={ACCENT}
@@ -150,4 +187,13 @@ const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: colors.background },
   container: { flex: 1 },
   content: { padding: spacing.lg, paddingBottom: spacing.xxl },
+  hero: { marginBottom: spacing.lg },
+  heroLabel: { letterSpacing: 1, marginBottom: 2 },
+  heroTopRow: { alignItems: 'flex-start', marginBottom: spacing.sm },
+  headerCard: { padding: spacing.md, borderRadius: 24, marginBottom: spacing.lg, shadowColor: colors.black, shadowOpacity: 0.08, shadowRadius: 20, elevation: 3 },
+  headerTopRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  statusChip: { backgroundColor: colors.surface, borderRadius: 999, paddingVertical: spacing.xs, paddingHorizontal: spacing.sm },
+  headerInfoRow: { flexDirection: 'row', justifyContent: 'space-between', marginTop: spacing.lg },
+  infoCard: { flex: 1, backgroundColor: colors.background, borderRadius: 18, padding: spacing.md, minHeight: 90, justifyContent: 'space-between' },
+  heroActions: { flexDirection: 'row', marginTop: spacing.lg },
 });
