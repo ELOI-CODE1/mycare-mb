@@ -209,21 +209,33 @@ export default function GirlDashboard() {
   };
 
   const handleSaveCycle = async () => {
-    if (!firstDayLastPeriod) {
-      Alert.alert('Missing information', 'Please enter the first day of your last period.');
+    if (!firstDayLastPeriod || !lastDayLastPeriod) {
+      Alert.alert('Missing information', 'Please select both the first day and last day of your period.');
       return;
     }
 
-    const parsedDate = parse(firstDayLastPeriod, 'MM/dd/yyyy', new Date());
-    if (isNaN(parsedDate.getTime())) {
-      Alert.alert('Invalid date', 'Please use the format MM/DD/YYYY for the first day.');
+    const start = parse(firstDayLastPeriod, 'MM/dd/yyyy', new Date());
+    const end = parse(lastDayLastPeriod, 'MM/dd/yyyy', new Date());
+    if (isNaN(start.getTime()) || isNaN(end.getTime())) {
+      Alert.alert('Invalid date', 'Please use the format MM/DD/YYYY for both dates.');
       return;
     }
 
-    const newDates = await addPeriodDate(format(parsedDate, 'yyyy-MM-dd'));
+    if (end < start) {
+      Alert.alert('Invalid range', 'The last day must be the same or after the first day.');
+      return;
+    }
+
+    let newDates: string[] = [];
+    let current = start;
+    while (current <= end) {
+      newDates = await addPeriodDate(format(current, 'yyyy-MM-dd'));
+      current = addDays(current, 1);
+    }
+
     setPeriodDates(newDates);
     await loadData();
-    setSaveMessage('Datos de ciclo guardados. Predicciones actualizadas.');
+    setSaveMessage('Cycle registered. Predictions updated.');
   };
 
   const handleConfirmDatePicker = () => {
