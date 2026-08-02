@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { View, StyleSheet, ScrollView, Alert, TouchableOpacity } from 'react-native';
+import { View, StyleSheet, ScrollView, Alert, TouchableOpacity, Dimensions } from 'react-native';
 import { Calendar } from 'react-native-calendars';
 import { format, parse, parseISO, differenceInDays, addDays } from 'date-fns';
+import { PieChart } from 'react-native-chart-kit';
 import { supabase } from '../lib/supabase';
 import { loadPeriodDates, addPeriodDate, removePeriodDate } from '../utils/periodStorage';
 import AddToCartModal from '../components/AddToCartModal';
@@ -27,6 +28,19 @@ type PhaseDetails = {
 
 const ACCENT = roleColors.girl.accent;
 const SOFT = roleColors.girl.soft;
+const chartWidth = Dimensions.get('window').width - spacing.lg * 2;
+const pieChartData = [
+  { name: 'Menstruation', population: 5, color: '#e91e63', legendFontColor: colors.gray700, legendFontSize: 12 },
+  { name: 'Follicular', population: 8, color: '#f48fb1', legendFontColor: colors.gray700, legendFontSize: 12 },
+  { name: 'Ovulation', population: 2, color: '#f06292', legendFontColor: colors.gray700, legendFontSize: 12 },
+  { name: 'Luteal', population: 13, color: '#f8bbd0', legendFontColor: colors.gray700, legendFontSize: 12 },
+];
+const pieChartConfig = {
+  backgroundGradientFrom: 'transparent',
+  backgroundGradientTo: 'transparent',
+  color: (opacity = 1) => `rgba(34, 34, 34, ${opacity})`,
+  labelColor: (opacity = 1) => `rgba(68, 68, 68, ${opacity})`,
+};
 
 const phaseDetails: PhaseDetails[] = [
   {
@@ -352,6 +366,24 @@ export default function GirlDashboard() {
               {saveMessage ? <Text muted style={{ marginTop: spacing.sm }}>{saveMessage}</Text> : null}
             </Card>
 
+            <Card>
+              <Text variant="heading">Cycle distribution</Text>
+              <Text muted style={{ marginTop: spacing.xs }}>
+                See how the phases split across a typical 28-day cycle.
+              </Text>
+              <View style={{ marginTop: spacing.md, alignItems: 'center' }}>
+                <PieChart
+                  data={pieChartData}
+                  width={chartWidth}
+                  height={220}
+                  chartConfig={pieChartConfig}
+                  accessor="population"
+                  backgroundColor="transparent"
+                  paddingLeft="15"
+                  absolute
+                />
+              </View>
+            </Card>
             <Card>
               <Text variant="heading">Cycle calendar</Text>
               <Text muted style={{ marginTop: spacing.xs }}>
