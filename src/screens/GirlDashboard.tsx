@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { View, StyleSheet, ScrollView, Alert, TouchableOpacity, Dimensions } from 'react-native';
+import { View, StyleSheet, ScrollView, Alert, TouchableOpacity, Dimensions, Modal } from 'react-native';
 import { Calendar } from 'react-native-calendars';
 import { format, parse, parseISO, differenceInDays, addDays } from 'date-fns';
 import { PieChart } from 'react-native-chart-kit';
@@ -104,8 +104,12 @@ export default function GirlDashboard() {
   const [pregnancyLMP, setPregnancyLMP] = useState('');
   const [saveMessage, setSaveMessage] = useState('');
   const [pregnancyMessage, setPregnancyMessage] = useState('');
+  const [showDatePicker, setShowDatePicker] = useState(false);
+  const [datePickerField, setDatePickerField] = useState<'first' | 'last' | 'pregnancy' | null>(null);
+  const [tempSelectedDate, setTempSelectedDate] = useState(format(new Date(), 'yyyy-MM-dd'));
 
-  const firstName = profile?.full_name?.split(' ')[0] || 'there';
+  const firstName = profile?.full_name?.split(' ')[0] ?? '';
+  const greeting = firstName ? `Hello ${firstName}` : 'Hello';
 
   useEffect(() => {
     init();
@@ -222,22 +226,36 @@ export default function GirlDashboard() {
     const newDates = await addPeriodDate(format(parsedDate, 'yyyy-MM-dd'));
     setPeriodDates(newDates);
     await loadData();
-    setSaveMessage('Cycle data saved. Predictions updated.');
+    setSaveMessage('Datos de ciclo guardados. Predicciones actualizadas.');
+  };
+
+  const handleConfirmDatePicker = () => {
+    if (!datePickerField) return;
+    const selectedDate = parseISO(tempSelectedDate);
+    if (isNaN(selectedDate.getTime())) {
+      Alert.alert('Fecha inválida', 'No se pudo leer la fecha seleccionada.');
+      return;
+    }
+    const formattedValue = format(selectedDate, 'MM/dd/yyyy');
+    if (datePickerField === 'first') setFirstDayLastPeriod(formattedValue);
+    if (datePickerField === 'last') setLastDayLastPeriod(formattedValue);
+    if (datePickerField === 'pregnancy') setPregnancyLMP(formattedValue);
+    setShowDatePicker(false);
   };
 
   const handleTrackPregnancy = () => {
     if (!pregnancyLMP) {
-      Alert.alert('Missing information', 'Please enter the first day of your last menstrual period.');
+      Alert.alert('Falta información', 'Por favor ingresa el primer día de tu última menstruación.');
       return;
     }
 
     const parsedDate = parse(pregnancyLMP, 'MM/dd/yyyy', new Date());
     if (isNaN(parsedDate.getTime())) {
-      Alert.alert('Invalid date', 'Please use the format MM/DD/YYYY.');
+      Alert.alert('Fecha inválida', 'Por favor utiliza el formato MM/DD/YYYY.');
       return;
     }
 
-    setPregnancyMessage(`Tracked LMP: ${format(parsedDate, 'MMM d, yyyy')}. We will keep the pregnancy milestones ready.`);
+    setPregnancyMessage(`LMP registrada: ${format(parsedDate, 'MMM d, yyyy')}. Mantendremos los hitos listos.`);
   };
 
   const toggleSymptom = (symptom: string) => {
@@ -262,16 +280,34 @@ export default function GirlDashboard() {
     <View style={styles.root}>
       <AppHeader role="girl" />
       <ScrollView style={styles.container} contentContainerStyle={styles.content}>
-        <Text variant="title">Hello, {firstName}</Text>
+        <Text variant="title">{greeting}</Text>
         <Text muted style={{ marginBottom: spacing.lg }}>
-          Your body, your pace — here is a calm, private space to learn and track.
+          Tu cuerpo, tu ritmo — un espacio privado para monitorear tu ciclo.
         </Text>
+
+        <Card style={[styles.pieCard, { backgroundColor: SOFT }]}> 
+          <Text variant="caption" color={ACCENT} style={styles.heroLabel}>Distribución del ciclo</Text>
+          <Text variant="heading" color={ACCENT}>Visualiza tu ciclo menstrual</Text>
+          <Text muted style={{ marginTop: spacing.xs }}>Gráfico de fases de un ciclo típico de 28 días.</Text>
+          <View style={styles.pieContainer}>
+            <PieChart
+              data={pieChartData}
+              width={chartWidth}
+              height={220}
+              chartConfig={pieChartConfig}
+              accessor="population"
+              backgroundColor="transparent"
+              paddingLeft="15"
+              absolute
+            />
+          </View>
+        </Card>
 
         <Segmented
           accent={ACCENT}
           value={activeTab}
           onChange={(k) => setActiveTab(k as any)}
-          tabs={[{ key: 'health', label: 'Health' }, { key: 'shop', label: 'Shop' }, { key: 'orders', label: 'Orders' }]}
+          tabs={[{ key: 'health', label: 'Salud' }, { key: 'shop', label: 'Tienda' }, { key: 'orders', label: 'Pedidos' }]}
         />
 
         {activeTab === 'health' && (
@@ -279,73 +315,87 @@ export default function GirlDashboard() {
             <View style={styles.statsRow}>
               <Card style={styles.statCard} padded={false}>
                 <View style={styles.statContent}>
-                  <Text variant="caption" muted>Current phase</Text>
+                  <Text variant="caption" muted>Fase actual</Text>
                   <Text variant="heading" color={ACCENT}>{cyclePhase}</Text>
                 </View>
               </Card>
               <Card style={styles.statCard} padded={false}>
                 <View style={styles.statContent}>
-                  <Text variant="caption" muted>Cycles tracked</Text>
+                  <Text variant="caption" muted>Ciclos registrados</Text>
                   <Text variant="heading">{periodDates.length}</Text>
                 </View>
               </Card>
               <Card style={styles.statCard} padded={false}>
                 <View style={styles.statContent}>
-                  <Text variant="caption" muted>Items in cart</Text>
+                  <Text variant="caption" muted>Artículos en carrito</Text>
                   <Text variant="heading">{checkoutCount}</Text>
                 </View>
               </Card>
               <Card style={styles.statCard} padded={false}>
                 <View style={styles.statContent}>
-                  <Text variant="caption" muted>Available</Text>
-                  <Text variant="heading">Expert help</Text>
+                  <Text variant="caption" muted>Disponible</Text>
+                  <Text variant="heading">Ayuda experta</Text>
                 </View>
               </Card>
             </View>
 
             <Card style={[styles.hero, { backgroundColor: SOFT }]}> 
-              <Text variant="caption" color={ACCENT} style={styles.heroLabel}>YOUR CYCLE OVERVIEW</Text>
+              <Text variant="caption" color={ACCENT} style={styles.heroLabel}>TU CICLO HOY</Text>
               <Text variant="title" color={ACCENT}>{cyclePhase}</Text>
               <Text muted style={{ marginTop: spacing.sm, lineHeight: 22 }}>
                 {predictionMessage}
               </Text>
               <View style={styles.heroRow}>
                 <View>
-                  <Text variant="caption" muted>Next period</Text>
+                  <Text variant="caption" muted>Próximo periodo</Text>
                   <Text variant="heading">{nextPeriodDate ? format(parseISO(nextPeriodDate), 'MMM d') : 'TBD'}</Text>
                 </View>
                 <View>
-                  <Text variant="caption" muted>Countdown</Text>
-                  <Text variant="heading">{daysUntilNextPeriod != null ? `${Math.max(0, daysUntilNextPeriod)} days` : '--'}</Text>
+                  <Text variant="caption" muted>Cuenta regresiva</Text>
+                  <Text variant="heading">{daysUntilNextPeriod != null ? `${Math.max(0, daysUntilNextPeriod)} días` : '--'}</Text>
                 </View>
               </View>
               <View style={styles.heroActions}>
-                <Button title="Log cycle" accent={ACCENT} onPress={handleLogPeriod} style={{ marginRight: spacing.sm, flex: 1 }} />
-                <Button title="View shop" accent={ACCENT} variant="secondary" onPress={() => setActiveTab('shop')} style={{ flex: 1 }} />
+                <Button title="Registrar ciclo" accent={ACCENT} onPress={handleLogPeriod} style={{ marginRight: spacing.sm, flex: 1 }} />
+                <Button title="Ir a tienda" accent={ACCENT} variant="secondary" onPress={() => setActiveTab('shop')} style={{ flex: 1 }} />
               </View>
             </Card>
 
             <Card>
               <View style={styles.sectionHeader}>
-                <Text variant="heading">Track new cycle</Text>
-                <Text variant="caption" muted>Enter your latest cycle details for better predictions.</Text>
+                <Text variant="heading">Registrar nuevo ciclo</Text>
+                <Text variant="caption" muted>Introduce las fechas para mejorar las predicciones.</Text>
               </View>
-              <Input
-                label="First day of last period"
-                placeholder="MM/DD/YYYY"
-                value={firstDayLastPeriod}
-                onChangeText={setFirstDayLastPeriod}
-              />
-              <Input
-                label="Last day of period"
-                placeholder="MM/DD/YYYY"
-                value={lastDayLastPeriod}
-                onChangeText={setLastDayLastPeriod}
-              />
+              <View style={styles.dateRow}>
+                <TouchableOpacity
+                  style={styles.dateInput}
+                  activeOpacity={0.8}
+                  onPress={() => {
+                    setDatePickerField('first')
+                    setTempSelectedDate(firstDayLastPeriod ? format(parse(firstDayLastPeriod, 'MM/dd/yyyy', new Date()), 'yyyy-MM-dd') : format(new Date(), 'yyyy-MM-dd'))
+                    setShowDatePicker(true)
+                  }}
+                >
+                  <Text variant="label">Primer día de la última menstruación</Text>
+                  <Text>{firstDayLastPeriod || 'Selecciona fecha'}</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={styles.dateInput}
+                  activeOpacity={0.8}
+                  onPress={() => {
+                    setDatePickerField('last')
+                    setTempSelectedDate(lastDayLastPeriod ? format(parse(lastDayLastPeriod, 'MM/dd/yyyy', new Date()), 'yyyy-MM-dd') : format(new Date(), 'yyyy-MM-dd'))
+                    setShowDatePicker(true)
+                  }}
+                >
+                  <Text variant="label">Último día de la menstruación</Text>
+                  <Text>{lastDayLastPeriod || 'Selecciona fecha'}</Text>
+                </TouchableOpacity>
+              </View>
               <View style={styles.formRow}>
                 <View style={styles.formHalf}>
                   <Input
-                    label="Cycle length (days)"
+                    label="Duración del ciclo (días)"
                     placeholder="28"
                     value={averageCycleLength}
                     keyboardType="numeric"
@@ -354,7 +404,7 @@ export default function GirlDashboard() {
                 </View>
                 <View style={styles.formHalf}>
                   <Input
-                    label="Period duration (days)"
+                    label="Duración del periodo (días)"
                     placeholder="5"
                     value={periodDuration}
                     keyboardType="numeric"
@@ -362,28 +412,10 @@ export default function GirlDashboard() {
                   />
                 </View>
               </View>
-              <Button title="Save & Calculate Cycle" accent={ACCENT} onPress={handleSaveCycle} style={{ marginTop: spacing.sm }} />
+              <Button title="Guardar y calcular" accent={ACCENT} onPress={handleSaveCycle} style={{ marginTop: spacing.sm }} />
               {saveMessage ? <Text muted style={{ marginTop: spacing.sm }}>{saveMessage}</Text> : null}
             </Card>
 
-            <Card>
-              <Text variant="heading">Cycle distribution</Text>
-              <Text muted style={{ marginTop: spacing.xs }}>
-                See how the phases split across a typical 28-day cycle.
-              </Text>
-              <View style={{ marginTop: spacing.md, alignItems: 'center' }}>
-                <PieChart
-                  data={pieChartData}
-                  width={chartWidth}
-                  height={220}
-                  chartConfig={pieChartConfig}
-                  accessor="population"
-                  backgroundColor="transparent"
-                  paddingLeft="15"
-                  absolute
-                />
-              </View>
-            </Card>
             <Card>
               <Text variant="heading">Cycle calendar</Text>
               <Text muted style={{ marginTop: spacing.xs }}>
@@ -405,9 +437,9 @@ export default function GirlDashboard() {
             </Card>
 
             <Card>
-              <Text variant="heading">Understanding your phases</Text>
+              <Text variant="heading">Entiende tus fases</Text>
               <Text muted style={{ marginTop: spacing.xs }}>
-                Learn the four phases and how they may affect your energy, mood, and comfort.
+                Aprender las cuatro fases y cómo pueden afectar tu energía, estado de ánimo y bienestar.
               </Text>
               <View style={{ marginTop: spacing.md }}>
                 {phaseDetails.map(phase => {
@@ -443,23 +475,29 @@ export default function GirlDashboard() {
 
             <Card>
               <View style={styles.sectionHeader}>
-                <Text variant="heading">Pregnancy tracking</Text>
-                <Text variant="caption" muted>Optional pregnancy milestones and reminders.</Text>
+                <Text variant="heading">Seguimiento del embarazo</Text>
+                <Text variant="caption" muted>Hitos opcionales y recordatorios.</Text>
               </View>
-              <Input
-                label="First day of last menstrual period (LMP)"
-                placeholder="MM/DD/YYYY"
-                value={pregnancyLMP}
-                onChangeText={setPregnancyLMP}
-              />
-              <Button title="Track Pregnancy" accent={ACCENT} onPress={handleTrackPregnancy} style={{ marginTop: spacing.sm }} />
+              <TouchableOpacity
+                style={styles.dateInput}
+                activeOpacity={0.8}
+                onPress={() => {
+                  setDatePickerField('pregnancy')
+                  setTempSelectedDate(pregnancyLMP ? format(parse(pregnancyLMP, 'MM/dd/yyyy', new Date()), 'yyyy-MM-dd') : format(new Date(), 'yyyy-MM-dd'))
+                  setShowDatePicker(true)
+                }}
+              >
+                <Text variant="label">Primer día de la última menstruación (LMP)</Text>
+                <Text>{pregnancyLMP || 'Selecciona fecha'}</Text>
+              </TouchableOpacity>
+              <Button title="Seguir embarazo" accent={ACCENT} onPress={handleTrackPregnancy} style={{ marginTop: spacing.sm }} />
               {pregnancyMessage ? <Text muted style={{ marginTop: spacing.sm }}>{pregnancyMessage}</Text> : null}
             </Card>
 
             <Card>
-              <Text variant="heading">Upcoming alerts</Text>
+              <Text variant="heading">Próximas alertas</Text>
               <Text muted style={{ marginTop: spacing.xs }}>
-                Stay in sync with your cycle with reminders and milestone prompts.
+                Mantente a la par de tu ciclo con recordatorios y avisos útiles.
               </Text>
               <View style={{ marginTop: spacing.md }}>
                 {[
@@ -474,7 +512,7 @@ export default function GirlDashboard() {
               </View>
             </Card>
             <Card>
-              <Text variant="heading">Support & resources</Text>
+              <Text variant="heading">Apoyo y recursos</Text>
               <View style={{ marginTop: spacing.md }}>
                 {[
                   { title: 'Confidential supplies', subtitle: 'Order wellness items privately from the shop.' },
@@ -551,6 +589,35 @@ export default function GirlDashboard() {
           product={selectedProduct}
           accent={ACCENT}
         />
+
+        <Modal visible={showDatePicker} transparent animationType="fade">
+          <View style={styles.dateModalOverlay}>
+            <View style={styles.dateModal}>
+              <Text variant="heading" style={styles.dateModalTitle}>
+                {datePickerField === 'pregnancy' ? 'Selecciona la fecha de LMP' : 'Selecciona una fecha'}
+              </Text>
+              <Calendar
+                current={tempSelectedDate}
+                markedDates={{
+                  ...markedDates,
+                  [tempSelectedDate]: { selected: true, selectedColor: ACCENT },
+                }}
+                onDayPress={(day) => setTempSelectedDate(day.dateString)}
+                theme={{
+                  todayTextColor: ACCENT,
+                  arrowColor: ACCENT,
+                  selectedDayBackgroundColor: ACCENT,
+                  monthTextColor: colors.text,
+                  textSectionTitleColor: colors.gray700,
+                }}
+              />
+              <View style={styles.modalActions}>
+                <Button title="Cancelar" variant="secondary" onPress={() => setShowDatePicker(false)} style={{ flex: 1, marginRight: spacing.sm }} />
+                <Button title="Guardar" accent={ACCENT} onPress={handleConfirmDatePicker} style={{ flex: 1 }} />
+              </View>
+            </View>
+          </View>
+        </Modal>
       </ScrollView>
     </View>
   );
@@ -569,7 +636,15 @@ const styles = StyleSheet.create({
   statsRow: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between', gap: spacing.md, marginBottom: spacing.lg },
   statCard: { flex: 1, minWidth: 150, padding: spacing.md, backgroundColor: colors.surface },
   statContent: { justifyContent: 'space-between', minHeight: 80 },
+  dateRow: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: spacing.md },
+  dateInput: { flex: 1, backgroundColor: colors.surface, borderRadius: 18, padding: spacing.md, minHeight: 90, justifyContent: 'space-between' },
   sectionHeader: { marginBottom: spacing.md },
+  pieCard: { padding: spacing.md, borderRadius: 24, marginBottom: spacing.lg, shadowColor: colors.black, shadowOpacity: 0.08, shadowRadius: 20, elevation: 3 },
+  pieContainer: { marginTop: spacing.md, alignItems: 'center' },
+  dateModalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.35)', justifyContent: 'center', padding: spacing.lg },
+  dateModal: { backgroundColor: colors.background, borderRadius: 24, padding: spacing.lg, shadowColor: colors.black, shadowOpacity: 0.2, shadowRadius: 20, elevation: 5 },
+  dateModalTitle: { marginBottom: spacing.md },
+  modalActions: { flexDirection: 'row', marginTop: spacing.lg },
   formRow: { flexDirection: 'row', justifyContent: 'space-between', gap: spacing.md },
   formHalf: { flex: 1 },
   phaseCard: { borderWidth: 1, borderColor: colors.border, borderRadius: 12, padding: spacing.md, marginTop: spacing.sm, backgroundColor: colors.surface },
