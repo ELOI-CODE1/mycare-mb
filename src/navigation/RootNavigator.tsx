@@ -17,6 +17,9 @@ import ProfileScreen from '../screens/ProfileScreen'
 import SettingsScreen from '../screens/SettingsScreen'
 import SecurityScreen from '../screens/SecurityScreen'
 import AboutScreen from '../screens/AboutScreen'
+import ChildAccounts from '../screens/ChildAccounts'
+import ManagedGirlDashboard from '../screens/ManagedGirlDashboard'
+import type { Profile } from '../context/AuthContext'
 
 export type RootStackParamList = {
   Login: undefined
@@ -28,6 +31,8 @@ export type RootStackParamList = {
   Settings: undefined
   Security: undefined
   About: undefined
+  ChildAccounts: undefined
+  ManagedGirlDashboard: { childProfile: Profile }
 }
 
 const Stack = createNativeStackNavigator<RootStackParamList>()

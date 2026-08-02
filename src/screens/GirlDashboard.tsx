@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { View, StyleSheet, ScrollView, Alert, TouchableOpacity } from 'react-native';
 import { Calendar } from 'react-native-calendars';
-import { format, parseISO, differenceInDays, addDays } from 'date-fns';
+import { format, parse, parseISO, differenceInDays, addDays } from 'date-fns';
 import { supabase } from '../lib/supabase';
 import { loadPeriodDates, addPeriodDate, removePeriodDate } from '../utils/periodStorage';
 import AddToCartModal from '../components/AddToCartModal';
@@ -11,7 +11,7 @@ import OrderCard from '../components/OrderCard';
 import { Text, Card, Button, Input, Segmented, EmptyState } from '../components/ui';
 import { useCart } from '../context/CartContext';
 import { useAuth } from '../context/AuthContext';
-import { colors, spacing, roleColors } from '../theme';
+import { colors, spacing, radius, roleColors } from '../theme';
 
 type Product = { id: number; name: string; description: string; price: number; category: string; image_url?: string | null; };
 type Order = { id: number; product_id: number; product_name: string; quantity: number; total_price: number; status: string; created_at: string; };
@@ -83,6 +83,13 @@ export default function GirlDashboard() {
   const [selectedFlow, setSelectedFlow] = useState<(typeof flowOptions)[number]>('Medium');
   const [selectedSymptoms, setSelectedSymptoms] = useState<string[]>(['Cramps']);
   const [showPregnancy, setShowPregnancy] = useState(false);
+  const [firstDayLastPeriod, setFirstDayLastPeriod] = useState('');
+  const [lastDayLastPeriod, setLastDayLastPeriod] = useState('');
+  const [averageCycleLength, setAverageCycleLength] = useState('28');
+  const [periodDuration, setPeriodDuration] = useState('5');
+  const [pregnancyLMP, setPregnancyLMP] = useState('');
+  const [saveMessage, setSaveMessage] = useState('');
+  const [pregnancyMessage, setPregnancyMessage] = useState('');
 
   const firstName = profile?.full_name?.split(' ')[0] || 'there';
 
@@ -186,6 +193,39 @@ export default function GirlDashboard() {
     Alert.alert('Saved', `Flow: ${selectedFlow}. Symptoms: ${selectedSymptoms.join(', ') || 'none'}.`);
   };
 
+  const handleSaveCycle = async () => {
+    if (!firstDayLastPeriod) {
+      Alert.alert('Missing information', 'Please enter the first day of your last period.');
+      return;
+    }
+
+    const parsedDate = parse(firstDayLastPeriod, 'MM/dd/yyyy', new Date());
+    if (isNaN(parsedDate.getTime())) {
+      Alert.alert('Invalid date', 'Please use the format MM/DD/YYYY for the first day.');
+      return;
+    }
+
+    const newDates = await addPeriodDate(format(parsedDate, 'yyyy-MM-dd'));
+    setPeriodDates(newDates);
+    await loadData();
+    setSaveMessage('Cycle data saved. Predictions updated.');
+  };
+
+  const handleTrackPregnancy = () => {
+    if (!pregnancyLMP) {
+      Alert.alert('Missing information', 'Please enter the first day of your last menstrual period.');
+      return;
+    }
+
+    const parsedDate = parse(pregnancyLMP, 'MM/dd/yyyy', new Date());
+    if (isNaN(parsedDate.getTime())) {
+      Alert.alert('Invalid date', 'Please use the format MM/DD/YYYY.');
+      return;
+    }
+
+    setPregnancyMessage(`Tracked LMP: ${format(parsedDate, 'MMM d, yyyy')}. We will keep the pregnancy milestones ready.`);
+  };
+
   const toggleSymptom = (symptom: string) => {
     setSelectedSymptoms(prev =>
       prev.includes(symptom) ? prev.filter(item => item !== symptom) : [...prev, symptom],
@@ -222,41 +262,120 @@ export default function GirlDashboard() {
 
         {activeTab === 'health' && (
           <View>
-            <Card style={[styles.hero, { backgroundColor: SOFT }]}>
-              <View style={styles.heroTopRow}>
-                <View style={styles.badge}>
-                  <Text variant="caption" color={ACCENT}>🔒 Confidential & Secure</Text>
+            <View style={styles.statsRow}>
+              <Card style={styles.statCard} padded={false}>
+                <View style={styles.statContent}>
+                  <Text variant="caption" muted>Current phase</Text>
+                  <Text variant="heading" color={ACCENT}>{cyclePhase}</Text>
+                </View>
+              </Card>
+              <Card style={styles.statCard} padded={false}>
+                <View style={styles.statContent}>
+                  <Text variant="caption" muted>Cycles tracked</Text>
+                  <Text variant="heading">{periodDates.length}</Text>
+                </View>
+              </Card>
+              <Card style={styles.statCard} padded={false}>
+                <View style={styles.statContent}>
+                  <Text variant="caption" muted>Items in cart</Text>
+                  <Text variant="heading">{checkoutCount}</Text>
+                </View>
+              </Card>
+              <Card style={styles.statCard} padded={false}>
+                <View style={styles.statContent}>
+                  <Text variant="caption" muted>Available</Text>
+                  <Text variant="heading">Expert help</Text>
+                </View>
+              </Card>
+            </View>
+
+            <Card style={[styles.hero, { backgroundColor: SOFT }]}> 
+              <Text variant="caption" color={ACCENT} style={styles.heroLabel}>YOUR CYCLE OVERVIEW</Text>
+              <Text variant="title" color={ACCENT}>{cyclePhase}</Text>
+              <Text muted style={{ marginTop: spacing.sm, lineHeight: 22 }}>
+                {predictionMessage}
+              </Text>
+              <View style={styles.heroRow}>
+                <View>
+                  <Text variant="caption" muted>Next period</Text>
+                  <Text variant="heading">{nextPeriodDate ? format(parseISO(nextPeriodDate), 'MMM d') : 'TBD'}</Text>
+                </View>
+                <View>
+                  <Text variant="caption" muted>Countdown</Text>
+                  <Text variant="heading">{daysUntilNextPeriod != null ? `${Math.max(0, daysUntilNextPeriod)} days` : '--'}</Text>
                 </View>
               </View>
-              <Text variant="caption" color={ACCENT} style={styles.heroLabel}>CURRENT PHASE</Text>
-              <Text variant="title" color={ACCENT}>{cyclePhase}</Text>
-              <Text muted style={{ marginTop: spacing.sm }}>
-                Day {Math.max(1, differenceInDays(new Date(), parseISO(periodDates[0] || format(new Date(), 'yyyy-MM-dd'))) + 1)} of your cycle
-              </Text>
-              {daysUntilNextPeriod != null && nextPeriodDate ? (
-                <View style={styles.heroRow}>
-                  <View>
-                    <Text variant="caption" muted>Next period</Text>
-                    <Text variant="heading">{format(parseISO(nextPeriodDate), 'MMM d')}</Text>
-                  </View>
-                  <View>
-                    <Text variant="caption" muted>Countdown</Text>
-                    <Text variant="heading">{Math.max(0, daysUntilNextPeriod)} days</Text>
-                  </View>
-                </View>
-              ) : (
-                <Text muted style={{ marginTop: spacing.sm }}>{predictionMessage}</Text>
-              )}
               <View style={styles.heroActions}>
-                <Button title="Log Cycle" accent={ACCENT} onPress={handleLogPeriod} style={{ marginRight: spacing.sm, flex: 1 }} />
-                <Button title="View Shop" accent={ACCENT} variant="secondary" onPress={() => setActiveTab('shop')} style={{ flex: 1 }} />
+                <Button title="Log cycle" accent={ACCENT} onPress={handleLogPeriod} style={{ marginRight: spacing.sm, flex: 1 }} />
+                <Button title="View shop" accent={ACCENT} variant="secondary" onPress={() => setActiveTab('shop')} style={{ flex: 1 }} />
               </View>
             </Card>
 
             <Card>
-              <Text variant="heading">How your body is feeling today</Text>
+              <View style={styles.sectionHeader}>
+                <Text variant="heading">Track new cycle</Text>
+                <Text variant="caption" muted>Enter your latest cycle details for better predictions.</Text>
+              </View>
+              <Input
+                label="First day of last period"
+                placeholder="MM/DD/YYYY"
+                value={firstDayLastPeriod}
+                onChangeText={setFirstDayLastPeriod}
+              />
+              <Input
+                label="Last day of period"
+                placeholder="MM/DD/YYYY"
+                value={lastDayLastPeriod}
+                onChangeText={setLastDayLastPeriod}
+              />
+              <View style={styles.formRow}>
+                <View style={styles.formHalf}>
+                  <Input
+                    label="Cycle length (days)"
+                    placeholder="28"
+                    value={averageCycleLength}
+                    keyboardType="numeric"
+                    onChangeText={setAverageCycleLength}
+                  />
+                </View>
+                <View style={styles.formHalf}>
+                  <Input
+                    label="Period duration (days)"
+                    placeholder="5"
+                    value={periodDuration}
+                    keyboardType="numeric"
+                    onChangeText={setPeriodDuration}
+                  />
+                </View>
+              </View>
+              <Button title="Save & Calculate Cycle" accent={ACCENT} onPress={handleSaveCycle} style={{ marginTop: spacing.sm }} />
+              {saveMessage ? <Text muted style={{ marginTop: spacing.sm }}>{saveMessage}</Text> : null}
+            </Card>
+
+            <Card>
+              <Text variant="heading">Cycle calendar</Text>
               <Text muted style={{ marginTop: spacing.xs }}>
-                Learn the phase you’re in and get supportive reminders that feel gentle, not overwhelming.
+                Tap a date to log or remove a period. Your calendar will keep the pattern visible and private.
+              </Text>
+              <View style={{ marginTop: spacing.md, overflow: 'hidden', borderRadius: 16 }}>
+                <Calendar
+                  markedDates={markedDates}
+                  onDayPress={handleDayPress}
+                  theme={{
+                    todayTextColor: ACCENT,
+                    arrowColor: ACCENT,
+                    selectedDayBackgroundColor: ACCENT,
+                    textSectionTitleColor: colors.gray700,
+                    monthTextColor: colors.text,
+                  }}
+                />
+              </View>
+            </Card>
+
+            <Card>
+              <Text variant="heading">Understanding your phases</Text>
+              <Text muted style={{ marginTop: spacing.xs }}>
+                Learn the four phases and how they may affect your energy, mood, and comfort.
               </Text>
               <View style={{ marginTop: spacing.md }}>
                 {phaseDetails.map(phase => {
@@ -291,75 +410,37 @@ export default function GirlDashboard() {
             </Card>
 
             <Card>
-              <Text variant="heading">Cycle calendar</Text>
-              <Text muted style={{ marginTop: spacing.xs }}>
-                Tap a date to log or remove a period. Your calendar will keep the pattern visible and private.
-              </Text>
-              <View style={{ marginTop: spacing.md, overflow: 'hidden', borderRadius: 16 }}>
-                <Calendar
-                  markedDates={markedDates}
-                  onDayPress={handleDayPress}
-                  theme={{
-                    todayTextColor: ACCENT,
-                    arrowColor: ACCENT,
-                    selectedDayBackgroundColor: ACCENT,
-                    textSectionTitleColor: colors.gray700,
-                    monthTextColor: colors.text,
-                  }}
-                />
+              <View style={styles.sectionHeader}>
+                <Text variant="heading">Pregnancy tracking</Text>
+                <Text variant="caption" muted>Optional pregnancy milestones and reminders.</Text>
               </View>
+              <Input
+                label="First day of last menstrual period (LMP)"
+                placeholder="MM/DD/YYYY"
+                value={pregnancyLMP}
+                onChangeText={setPregnancyLMP}
+              />
+              <Button title="Track Pregnancy" accent={ACCENT} onPress={handleTrackPregnancy} style={{ marginTop: spacing.sm }} />
+              {pregnancyMessage ? <Text muted style={{ marginTop: spacing.sm }}>{pregnancyMessage}</Text> : null}
             </Card>
 
             <Card>
-              <Text variant="heading">Quick log</Text>
+              <Text variant="heading">Upcoming alerts</Text>
               <Text muted style={{ marginTop: spacing.xs }}>
-                Add a few details for your own notes without pressure.
+                Stay in sync with your cycle with reminders and milestone prompts.
               </Text>
               <View style={{ marginTop: spacing.md }}>
-                <Text variant="label">Flow</Text>
-                <View style={styles.optionRow}>
-                  {flowOptions.map(option => (
-                    <TouchableOpacity
-                      key={option}
-                      onPress={() => setSelectedFlow(option)}
-                      style={[styles.optionChip, selectedFlow === option && styles.optionChipActive]}
-                    >
-                      <Text color={selectedFlow === option ? colors.textInverse : colors.text}>{option}</Text>
-                    </TouchableOpacity>
-                  ))}
-                </View>
-                <Text variant="label" style={{ marginTop: spacing.md }}>Symptoms</Text>
-                <View style={styles.optionRow}>
-                  {symptomOptions.map(option => (
-                    <TouchableOpacity
-                      key={option}
-                      onPress={() => toggleSymptom(option)}
-                      style={[styles.optionChip, selectedSymptoms.includes(option) && styles.optionChipActive]}
-                    >
-                      <Text color={selectedSymptoms.includes(option) ? colors.textInverse : colors.text}>{option}</Text>
-                    </TouchableOpacity>
-                  ))}
-                </View>
-                <Button title="Save quick log" accent={ACCENT} onPress={handleQuickLog} style={{ marginTop: spacing.lg }} />
+                {[
+                  'Cycle check-in tomorrow',
+                  'Hydration reminder for your current phase',
+                  'Order wellness essentials before next week',
+                ].map(alert => (
+                  <View key={alert} style={styles.alertItem}>
+                    <Text variant="label">{alert}</Text>
+                  </View>
+                ))}
               </View>
             </Card>
-
-            <Card>
-              <View style={styles.rowBetween}>
-                <Text variant="heading">Pregnancy & milestones</Text>
-                <TouchableOpacity onPress={() => setShowPregnancy(prev => !prev)}>
-                  <Text color={ACCENT}>{showPregnancy ? 'Hide' : 'Show'}</Text>
-                </TouchableOpacity>
-              </View>
-              {showPregnancy && (
-                <View style={{ marginTop: spacing.md }}>
-                  <Text muted>
-                    This space can later hold prenatal reminders, medical appointments, and supportive milestones.
-                  </Text>
-                </View>
-              )}
-            </Card>
-
             <Card>
               <Text variant="heading">Support & resources</Text>
               <View style={{ marginTop: spacing.md }}>
@@ -453,6 +534,12 @@ const styles = StyleSheet.create({
   badge: { backgroundColor: colors.surface, borderRadius: 999, paddingHorizontal: spacing.md, paddingVertical: spacing.xs },
   heroRow: { flexDirection: 'row', justifyContent: 'space-between', marginTop: spacing.lg },
   heroActions: { flexDirection: 'row', marginTop: spacing.lg },
+  statsRow: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between', gap: spacing.md, marginBottom: spacing.lg },
+  statCard: { flex: 1, minWidth: 150, padding: spacing.md, backgroundColor: colors.surface },
+  statContent: { justifyContent: 'space-between', minHeight: 80 },
+  sectionHeader: { marginBottom: spacing.md },
+  formRow: { flexDirection: 'row', justifyContent: 'space-between', gap: spacing.md },
+  formHalf: { flex: 1 },
   phaseCard: { borderWidth: 1, borderColor: colors.border, borderRadius: 12, padding: spacing.md, marginTop: spacing.sm, backgroundColor: colors.surface },
   phaseHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   phaseBody: { marginTop: spacing.sm },
@@ -463,4 +550,5 @@ const styles = StyleSheet.create({
   optionChipActive: { backgroundColor: ACCENT, borderColor: ACCENT },
   rowBetween: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   resourceItem: { paddingVertical: spacing.md, borderBottomWidth: 1, borderBottomColor: colors.border },
+  alertItem: { backgroundColor: colors.gray100, borderRadius: radius.md, padding: spacing.md, marginTop: spacing.sm },
 });

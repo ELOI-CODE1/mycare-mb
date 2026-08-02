@@ -82,6 +82,18 @@ export default function AccountScreen() {
 
       {/* Menu */}
       <Card padded={false} style={{ overflow: 'hidden' }}>
+        {role === 'parent' && (
+          <>
+            <MenuRow
+              icon="people-outline"
+              label="Child accounts"
+              sublabel="Open the girl account you manage"
+              tint={accent}
+              onPress={() => navigation.navigate('ChildAccounts')}
+            />
+            <Divider />
+          </>
+        )}
         <MenuRow
           icon="settings-outline"
           label="Settings"
