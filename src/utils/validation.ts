@@ -3,6 +3,7 @@ export interface SignupFormData {
     email: string 
     password: string
     phone: string
+    location: string
 }
 
 export interface AnswersData {
@@ -15,6 +16,7 @@ export interface FormErrors {
     email?: string
     password?: string 
     phone?: string
+    location?: string
     q1?: string
     q2?: string
 }
@@ -54,6 +56,10 @@ export const validateStepOne = (data: SignupFormData): { isValid: boolean; error
         errors.phone = 'Phone number is required.'
     } else if (!PHONE_REGEX.test(data.phone.trim().replace(/\s+/g, ''))) {
         errors.phone = 'Enter a valid phone number.'
+    }
+
+    if (!data.location.trim()) {
+        errors.location = 'Your staying location is required.'
     }
 
     return{

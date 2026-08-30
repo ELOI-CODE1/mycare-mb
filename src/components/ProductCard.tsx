@@ -22,13 +22,16 @@ interface Props {
   description?: string
   category?: string
   image?: string | null
+  images?: string[] | null
+  discountPercent?: number
   accent?: string
   soft?: string
   onAdd: () => void
   onPress?: () => void
 }
 
-export default function ProductCard({ name, price, description, category, image, accent = colors.primary, soft = colors.gray100, onAdd, onPress }: Props) {
+export default function ProductCard({ name, price, description, category, image, discountPercent = 0, accent = colors.primary, soft = colors.gray100, onAdd, onPress }: Props) {
+  const discountedPrice = Math.max(0, price * (1 - Math.min(100, Math.max(0, discountPercent)) / 100))
   return (
     <Card style={styles.card}>
       <TouchableOpacity style={styles.content} onPress={onPress} activeOpacity={0.85}>
@@ -49,9 +52,11 @@ export default function ProductCard({ name, price, description, category, image,
               {description}
             </Text>
           ) : null}
-          <Text variant="heading" color={accent} style={{ marginTop: spacing.xs }}>
-            {price.toLocaleString()} RWF
-          </Text>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.sm, marginTop: spacing.xs }}>
+            <Text variant="heading" color={accent}>{discountedPrice.toLocaleString()} RWF</Text>
+            {discountPercent > 0 ? <Text variant="caption" muted style={{ textDecorationLine: 'line-through' }}>{price.toLocaleString()}</Text> : null}
+          </View>
+          {discountPercent > 0 ? <Text variant="caption" color={colors.success}>{discountPercent}% off</Text> : null}
         </View>
       </TouchableOpacity>
 

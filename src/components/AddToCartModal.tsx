@@ -5,7 +5,7 @@ import { Text, Button } from './ui'
 import { useCart } from '../context/CartContext'
 import { colors, spacing, radius } from '../theme'
 
-type Product = { id: number; name: string; price: number; description?: string; category?: string; image_url?: string | null; images?: string[] | null }
+type Product = { id: number; name: string; price: number; description?: string; category?: string; image_url?: string | null; images?: string[] | null; discountPercent?: number }
 
 interface Props {
   visible: boolean
@@ -41,7 +41,9 @@ export default function AddToCartModal({ visible, onClose, product, accent = col
   if (!product) return null
 
   const images = parseImages(product.image_url, product.images)
-  const lineTotal = product.price * quantity
+  const discountPercent = product.discountPercent || 0
+  const unitPrice = Math.max(0, product.price * (1 - Math.min(100, discountPercent) / 100))
+  const lineTotal = unitPrice * quantity
 
   const handleAdd = () => {
     addItem({ id: product.id, name: product.name, price: product.price }, quantity)
@@ -94,7 +96,7 @@ export default function AddToCartModal({ visible, onClose, product, accent = col
               </Text>
             ) : null}
             <Text variant="label" color={accent} style={{ marginTop: 6 }}>
-              {product.price.toLocaleString()} RWF
+              {unitPrice.toLocaleString()} RWF {discountPercent ? `(${discountPercent}% off)` : ''}
             </Text>
           </View>
 

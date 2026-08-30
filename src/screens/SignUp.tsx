@@ -1,8 +1,6 @@
 import React, { useState } from 'react'
 import { View, TouchableOpacity, StyleSheet, ScrollView, Alert, ActivityIndicator } from 'react-native'
 import type { NativeStackScreenProps } from '@react-navigation/native-stack'
-import { supabase } from '../lib/supabase'
-import { useAuth } from '../context/AuthContext'
 import { Text, Input, Button, Card, Screen } from '../components/ui'
 import { colors, spacing, radius } from '../theme'
 import { validateStepOne, validateStepTwo, FormErrors } from '../utils/validation'
@@ -30,7 +28,6 @@ export const questions = [
 ]
 
 export default function SignUp({ navigation }: Props) {
-  const { signOut } = useAuth()
   const [step, setStep] = useState(0)
 
   // Form State
@@ -38,6 +35,7 @@ export default function SignUp({ navigation }: Props) {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [phone, setPhone] = useState('')
+  const [location, setLocation] = useState('')
   const [answers, setAnswers] = useState<Record<string, string>>({})
 
   // Errors & Loading State
@@ -46,7 +44,7 @@ export default function SignUp({ navigation }: Props) {
 
   // Handle Step 1 Next
   const handleNextStep = () => {
-    const { isValid, errors: stepErrors } = validateStepOne({ fullName, email, password, phone })
+    const { isValid, errors: stepErrors } = validateStepOne({ fullName, email, password, phone, location })
     setErrors(stepErrors)
 
     if (isValid) {
@@ -69,66 +67,8 @@ export default function SignUp({ navigation }: Props) {
     if (!isValid) return
 
     setLoading(true)
-    const assignedRole = determineRole(answers)
-
-    const { data, error } = await supabase.auth.signUp({
-      email: email.trim(),
-      password,
-      options: {
-        data: {
-          full_name: fullName.trim(),
-          phone: phone.trim(),
-          gender: answers['q2'],
-          role: assignedRole,
-        },
-      },
-    })
-
-    if (error) {
-      setLoading(false)
-      Alert.alert('Registration Failed', error.message)
-      return
-    }
-
-    if (data.user) {
-      const profilePayload = {
-        id: data.user.id,
-        email: email.trim(),
-        full_name: fullName.trim(),
-        phone: phone.trim(),
-        gender: answers['q2'],
-        role: assignedRole,
-      }
-
-      const { error: profileError } = await supabase
-        .from('profiles')
-        .upsert(profilePayload, { onConflict: 'id' })
-
-      if (profileError) {
-        console.warn('Profile DB Error:', profileError.message)
-      }
-
-      try {
-        const { error: metadataError } = await supabase.auth.updateUser({
-          data: {
-            full_name: fullName.trim(),
-            phone: phone.trim(),
-            gender: answers['q2'],
-            role: assignedRole,
-          },
-        })
-
-        if (metadataError) {
-          console.warn('Auth metadata update error:', metadataError.message)
-        }
-      } catch (metadataException) {
-        console.warn('Auth metadata update exception:', metadataException)
-      }
-    }
-
-    await signOut()
     setLoading(false)
-    Alert.alert('Success', 'Account created successfully! Please log in.')
+    Alert.alert('Registration unavailable', 'Connect your new backend API to enable account registration.')
     navigation.navigate('Login')
   }
 
@@ -204,6 +144,20 @@ export default function SignUp({ navigation }: Props) {
             {errors.phone && <Text style={styles.errorText}>{errors.phone}</Text>}
           </View>
 
+          <View style={styles.inputGroup}>
+            <Input
+              label="Staying location"
+              placeholder="City, district, or address"
+              value={location}
+              onChangeText={(val) => {
+                setLocation(val)
+                if (errors.location) setErrors((prev) => ({ ...prev, location: undefined }))
+              }}
+              multiline
+            />
+            {errors.location && <Text style={styles.errorText}>{errors.location}</Text>}
+          </View>
+
           <Button title="Continue" onPress={handleNextStep} style={{ marginTop: spacing.md }} />
         </Card>
       </Screen>
@@ -255,6 +209,9 @@ export default function SignUp({ navigation }: Props) {
           })}
 
           <Button title="Complete Registration" onPress={handleSignUp} style={{ marginTop: spacing.lg }} />
+          <Text variant="caption" muted center style={{ marginTop: spacing.md }}>
+            Your new backend will send a verification code to confirm this account.
+          </Text>
 
           <TouchableOpacity onPress={() => setStep(0)} style={styles.backButton}>
             <Text muted>Back</Text>

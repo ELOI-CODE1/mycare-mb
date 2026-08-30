@@ -2,7 +2,6 @@ import React, { useState } from 'react'
 import { View, Alert, TouchableOpacity, StyleSheet } from 'react-native'
 import type { NativeStackScreenProps } from '@react-navigation/native-stack'
 import { Screen, Text, Input, Button } from '../components/ui'
-import { supabase } from '../lib/supabase'
 import { colors, spacing } from '../theme'
 import type { RootStackParamList } from '../navigation/RootNavigator'
 
@@ -19,14 +18,8 @@ export default function ResetPassword({ navigation }: Props) {
       return
     }
     setLoading(true)
-    const { error } = await supabase.auth.resetPasswordForEmail(target)
     setLoading(false)
-    if (error) {
-      Alert.alert('Error', error.message)
-      return
-    }
-    Alert.alert('Email sent', 'Check your inbox for the password reset link.')
-    navigation.navigate('Login')
+    Alert.alert('Password reset unavailable', 'Connect your new backend API to send reset links.')
   }
 
   return (

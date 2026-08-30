@@ -1,608 +1,66 @@
-import React, { useState, useEffect } from 'react'
-import { View, StyleSheet, ScrollView, Alert, Modal, TouchableOpacity, Image, ActivityIndicator } from 'react-native'
-import { Ionicons } from '@expo/vector-icons'
-import { supabase } from '../lib/supabase'
-import { pickAndUploadImage } from '../lib/uploadImage'
+import React, { useMemo, useState } from 'react'
+import { ScrollView, StyleSheet, TextInput, TouchableOpacity, View } from 'react-native'
 import AppHeader from '../components/AppHeader'
-import { Text, Card, Button, Input, Badge, Segmented, EmptyState } from '../components/ui'
-import { categoryEmoji } from '../components/ProductCard'
-import AdminOverview from '../components/admin/AdminOverview'
-import AdminUsers from '../components/admin/AdminUsers'
-import { colors, spacing, radius, roleColors } from '../theme'
+import { Card, Text } from '../components/ui'
+import { getProductsByRole } from '../data/products'
+import { colors, radius, spacing } from '../theme'
 
-type Order = {
-  id: number
-  user_id: string
-  product_id: number
-  quantity: number
-  total_price: number
-  status: string
-  delivery_address: string
-  created_at: string
-  profiles?: { email: string; full_name?: string }
-  products?: { name: string }
-}
+type CustomerThread = { id: string; username: string; email: string; lastMessage: string; unread: number }
 
-type Product = {
-  id: number
-  name: string
-  description: string
-  price: number
-  category: string
-  visible_to: string[]
-  is_available: boolean
-  image_url?: string | null
-}
-
-function parseImageUrls(value?: string | null) {
-  if (!value) return []
-  return value
-    .split(/\|\||\n/)
-    .map((item) => item.trim())
-    .filter(Boolean)
-}
-
-const ACCENT = roleColors.admin.accent
-const SOFT = roleColors.admin.soft
-const STATUSES = ['pending', 'confirmed', 'shipped', 'delivered', 'cancelled']
-const CATEGORIES = ['pads', 'condoms', 'pain', 'hygiene', 'test']
-const AUDIENCE_TAGS = ['girl', 'boy', 'parent']
+const demoThreads: CustomerThread[] = [
+  { id: '1', username: 'Customer 1', email: 'customer1@example.com', lastMessage: 'I need help with my order.', unread: 1 },
+  { id: '2', username: 'Customer 2', email: 'customer2@example.com', lastMessage: 'Can you advise me?', unread: 2 },
+]
 
 export default function AdminDashboard() {
-  const [activeTab, setActiveTab] = useState<'overview' | 'users' | 'orders' | 'products'>('overview')
-  const [orders, setOrders] = useState<Order[]>([])
-  const [products, setProducts] = useState<Product[]>([])
-  const [showProductModal, setShowProductModal] = useState(false)
-  const [editingProduct, setEditingProduct] = useState<Product | null>(null)
-  const [productName, setProductName] = useState('')
-  const [productDescription, setProductDescription] = useState('')
-  const [productPrice, setProductPrice] = useState('')
-  const [productCategory, setProductCategory] = useState('')
-  const [productVisibleTo, setProductVisibleTo] = useState<string[]>([])
-  const [productImageUrl, setProductImageUrl] = useState<string | null>(null)
-  const [imageUploading, setImageUploading] = useState(false)
-  const [orderSearch, setOrderSearch] = useState('')
-  const [productSearch, setProductSearch] = useState('')
-  const [statusFilter, setStatusFilter] = useState<string>('all')
-  const [selectedOrder, setSelectedOrder] = useState<Order | null>(null)
-  const [orderModalMode, setOrderModalMode] = useState<'manage' | 'detail' | null>(null)
-
-  const closeOrderModal = () => {
-    setSelectedOrder(null)
-    setOrderModalMode(null)
-  }
-
-  const handleChangeStatus = async (orderId: number, status: string) => {
-    await updateOrderStatus(orderId, status)
-    setSelectedOrder(prev => (prev ? { ...prev, status } : prev))
-  }
-
-  const toggleVisibleTo = (tag: string) =>
-    setProductVisibleTo(prev => (prev.includes(tag) ? prev.filter(t => t !== tag) : [...prev, tag]))
-
-  const handlePickProductImage = async () => {
-    try {
-      setImageUploading(true)
-      const url = await pickAndUploadImage('product-images', 'product')
-      if (url) {
-        setProductImageUrl((prev) => {
-          const existing = prev ? parseImageUrls(prev) : []
-          if (existing.includes(url)) return prev
-          return [...existing, url].join('||')
-        })
-      }
-    } catch (e: any) {
-      Alert.alert('Upload failed', e?.message || 'Could not upload the image.')
-    } finally {
-      setImageUploading(false)
-    }
-  }
-
-  const removeLastProductImage = () => {
-    setProductImageUrl((prev) => {
-      const images = parseImageUrls(prev)
-      if (images.length === 0) return null
-      images.pop()
-      return images.length > 0 ? images.join('||') : null
-    })
-  }
-
-  useEffect(() => {
-    loadOrders()
-    loadProducts()
-  }, [])
-
-  const loadOrders = async () => {
-    const { data: ordersData, error: ordersError } = await supabase
-      .from('orders')
-      .select('*')
-      .order('created_at', { ascending: false })
-
-    if (ordersError) { console.error('Error loading orders:', ordersError); return }
-    if (!ordersData || ordersData.length === 0) { setOrders([]); return }
-
-    const userIds = [...new Set(ordersData.map(o => o.user_id))]
-    const { data: profilesData } = await supabase.from('profiles').select('id, email, full_name').in('id', userIds)
-
-    const productIds = [...new Set(ordersData.map(o => o.product_id))]
-    const { data: productsData } = await supabase.from('products').select('id, name').in('id', productIds)
-
-    const profileMap = new Map<string, any>()
-    profilesData?.forEach(p => profileMap.set(p.id, p))
-    const productMap = new Map<number, any>()
-    productsData?.forEach(p => productMap.set(p.id, p))
-
-    setOrders(ordersData.map(o => ({
-      ...o,
-      profiles: profileMap.get(o.user_id) || { email: 'Unknown' },
-      products: productMap.get(o.product_id) || { name: 'Unknown' },
-    })))
-  }
-
-  const loadProducts = async () => {
-    const { data, error } = await supabase.from('products').select('*').order('id')
-    if (error) console.error('Error loading products:', error)
-    else setProducts(data || [])
-  }
-
-  const updateOrderStatus = async (orderId: number, newStatus: string) => {
-    const { error } = await supabase.from('orders').update({ status: newStatus }).eq('id', orderId)
-    if (error) Alert.alert('Error', 'Failed to update order status')
-    else loadOrders()
-  }
-
-  const saveProduct = async () => {
-    if (!productName || !productPrice) {
-      Alert.alert('Error', 'Please enter a product name and price.')
-      return
-    }
-    if (!productCategory) {
-      Alert.alert('Error', 'Please choose a category.')
-      return
-    }
-    if (productVisibleTo.length === 0) {
-      Alert.alert('Error', 'Please choose who can see this product (at least one tag).')
-      return
-    }
-    const priceNum = parseInt(productPrice)
-
-    const payload = {
-      name: productName,
-      description: productDescription,
-      price: priceNum,
-      category: productCategory,
-      visible_to: productVisibleTo,
-      image_url: productImageUrl,
-    }
-
-    const { error } = editingProduct
-      ? await supabase.from('products').update(payload).eq('id', editingProduct.id)
-      : await supabase.from('products').insert({ ...payload, is_available: true })
-
-    if (error) {
-      Alert.alert('Error', `Failed to ${editingProduct ? 'update' : 'create'} product`)
-    } else {
-      setShowProductModal(false)
-      loadProducts()
-    }
-  }
-
-  const deleteProduct = (productId: number) => {
-    Alert.alert('Confirm', 'Delete this product?', [
-      { text: 'Cancel', style: 'cancel' },
-      {
-        text: 'Delete',
-        style: 'destructive',
-        onPress: async () => {
-          const { error } = await supabase.from('products').delete().eq('id', productId)
-          if (error) Alert.alert('Error', 'Failed to delete product')
-          else loadProducts()
-        },
-      },
-    ])
-  }
-
-  const openProductModal = (product?: Product) => {
-    if (product) {
-      setEditingProduct(product)
-      setProductName(product.name)
-      setProductDescription(product.description || '')
-      setProductPrice(product.price.toString())
-      setProductCategory(product.category)
-      setProductVisibleTo(product.visible_to || [])
-      setProductImageUrl(product.image_url || null)
-    } else {
-      setEditingProduct(null)
-      setProductName('')
-      setProductDescription('')
-      setProductPrice('')
-      setProductCategory('')
-      setProductVisibleTo([])
-      setProductImageUrl(null)
-    }
-    setShowProductModal(true)
-  }
-
-  // Client-side search + status filters for orders.
-  const productImages = parseImageUrls(productImageUrl)
-
-  const q = orderSearch.trim().toLowerCase()
-  const filteredOrders = orders
-    .filter(o => statusFilter === 'all' || (o.status || '').toLowerCase() === statusFilter)
-    .filter(o =>
-      !q ||
-      String(o.id).includes(q) ||
-      (o.profiles?.full_name || '').toLowerCase().includes(q) ||
-      (o.profiles?.email || '').toLowerCase().includes(q) ||
-      (o.products?.name || '').toLowerCase().includes(q) ||
-      (o.status || '').toLowerCase().includes(q),
-    )
-
-  const pq = productSearch.trim().toLowerCase()
-  const filteredProducts = pq
-    ? products.filter(p =>
-        p.name.toLowerCase().includes(pq) ||
-        (p.category || '').toLowerCase().includes(pq) ||
-        (p.description || '').toLowerCase().includes(pq),
-      )
-    : products
-
+  const [threads, setThreads] = useState(demoThreads)
+  const [discounts, setDiscounts] = useState<Record<string, string>>({})
+  const products = useMemo(() => getProductsByRole('girl'), [])
   return (
     <View style={styles.root}>
       <AppHeader role="admin" />
-      <ScrollView style={styles.container} contentContainerStyle={styles.content}>
-        <Text variant="title">Admin Dashboard</Text>
-        <Text muted style={{ marginBottom: spacing.lg }}>Manage users, orders and products.</Text>
-
-        <Segmented
-          accent={ACCENT}
-          value={activeTab}
-          onChange={(k) => setActiveTab(k as any)}
-          tabs={[
-            { key: 'overview', label: 'Overview' },
-            { key: 'users', label: 'Users' },
-            { key: 'orders', label: 'Orders' },
-            { key: 'products', label: 'Products' },
-          ]}
-        />
-
-        {/* OVERVIEW */}
-        {activeTab === 'overview' && (
-          <AdminOverview orders={orders} productCount={products.length} accent={ACCENT} soft={SOFT} />
-        )}
-
-        {/* USERS */}
-        {activeTab === 'users' && <AdminUsers />}
-
-        {/* ORDERS */}
-        {activeTab === 'orders' && (
-          <View>
-            {orders.length > 0 && (
-              <Input
-                placeholder="Search by order #, customer, product or status"
-                value={orderSearch}
-                onChangeText={setOrderSearch}
-              />
-            )}
-
-            {/* Status filter chips */}
-            {orders.length > 0 && (
-              <View style={styles.filterRow}>
-                {['all', ...STATUSES].map(s => {
-                  const active = statusFilter === s
-                  return (
-                    <TouchableOpacity
-                      key={s}
-                      onPress={() => setStatusFilter(s)}
-                      style={[styles.statusChip, active && { backgroundColor: ACCENT, borderColor: ACCENT }]}
-                    >
-                      <Text variant="caption" color={active ? colors.white : colors.gray700} style={{ textTransform: 'capitalize' }}>
-                        {s === 'all' ? 'All' : s}
-                      </Text>
-                    </TouchableOpacity>
-                  )
-                })}
+      <ScrollView contentContainerStyle={styles.content}>
+        <Card>
+          <Text variant="title">Admin dashboard</Text>
+          <Text muted style={{ marginTop: spacing.xs }}>Manage support conversations and product offers.</Text>
+        </Card>
+        <Card>
+          <Text variant="heading">Customer messages</Text>
+          {threads.map((thread) => (
+            <View key={thread.id} style={styles.thread}>
+              <View style={{ flex: 1 }}>
+                <Text variant="label">{thread.username}</Text>
+                <Text variant="caption" color={colors.primary}>{thread.email}</Text>
+                <Text variant="caption" muted numberOfLines={1}>{thread.lastMessage}</Text>
               </View>
-            )}
-
-            {orders.length === 0 ? (
-              <EmptyState icon="receipt-outline" title="No orders found" />
-            ) : filteredOrders.length === 0 ? (
-              <EmptyState icon="search-outline" title="No matching orders" />
-            ) : (
-              filteredOrders.map(order => (
-                <Card key={order.id}>
-                  <View style={styles.rowBetween}>
-                    <View style={{ flex: 1, paddingRight: spacing.sm }}>
-                      <Text variant="label" numberOfLines={1}>{order.profiles?.full_name || 'Unknown'}</Text>
-                      <Text variant="caption" muted numberOfLines={1}>{order.products?.name || 'Unknown'}</Text>
-                    </View>
-                    <Badge label={order.status} status={order.status} />
-                  </View>
-                  <View style={styles.orderBtnRow}>
-                    <TouchableOpacity
-                      style={[styles.orderBtn, { backgroundColor: SOFT }]}
-                      onPress={() => { setSelectedOrder(order); setOrderModalMode('manage') }}
-                    >
-                      <Ionicons name="options-outline" size={16} color={ACCENT} />
-                      <Text variant="caption" color={ACCENT}>Manage</Text>
-                    </TouchableOpacity>
-                    <TouchableOpacity
-                      style={[styles.orderBtn, { backgroundColor: colors.gray100 }]}
-                      onPress={() => { setSelectedOrder(order); setOrderModalMode('detail') }}
-                    >
-                      <Ionicons name="eye-outline" size={16} color={colors.gray700} />
-                      <Text variant="caption" color={colors.gray700}>Detail</Text>
-                    </TouchableOpacity>
-                  </View>
-                </Card>
-              ))
-            )}
-          </View>
-        )}
-
-        {/* PRODUCTS */}
-        {activeTab === 'products' && (
-          <View>
-            <Button
-              title="+ Add Product"
-              accent={ACCENT}
-              onPress={() => openProductModal()}
-              style={{ marginBottom: spacing.lg }}
-            />
-            {products.length > 0 && (
-              <Input
-                placeholder="Search products by name or category"
-                value={productSearch}
-                onChangeText={setProductSearch}
-              />
-            )}
-            {products.length === 0 ? (
-              <EmptyState icon="cube-outline" title="No products found" />
-            ) : filteredProducts.length === 0 ? (
-              <EmptyState icon="search-outline" title="No matching products" />
-            ) : (
-              filteredProducts.map(product => (
-                <Card key={product.id} style={styles.productCard}>
-                  {product.image_url ? (
-                    <Image source={{ uri: product.image_url }} style={styles.thumb} />
-                  ) : (
-                    <View style={[styles.thumb, { backgroundColor: SOFT, alignItems: 'center', justifyContent: 'center' }]}>
-                      <Text style={{ fontSize: 24 }}>{categoryEmoji(product.category)}</Text>
-                    </View>
-                  )}
-                  <View style={{ flex: 1 }}>
-                    <Text variant="label">{product.name}</Text>
-                    <Text variant="caption" muted numberOfLines={1}>{product.description}</Text>
-                    <Text variant="label" color={ACCENT} style={{ marginTop: 2 }}>{product.price.toLocaleString()} RWF</Text>
-                    <Text variant="caption" muted style={{ textTransform: 'capitalize' }}>Category: {product.category || '—'}</Text>
-                    <Text variant="caption" muted>Visible to: {product.visible_to?.join(', ') || '—'}</Text>
-                    <View style={styles.productActions}>
-                      <TouchableOpacity style={[styles.smallBtn, { backgroundColor: colors.blueSoft }]} onPress={() => openProductModal(product)}>
-                        <Ionicons name="create-outline" size={16} color={colors.blue} />
-                        <Text variant="caption" color={colors.blue}>Edit</Text>
-                      </TouchableOpacity>
-                      <TouchableOpacity style={[styles.smallBtn, { backgroundColor: colors.redSoft }]} onPress={() => deleteProduct(product.id)}>
-                        <Ionicons name="trash-outline" size={16} color={colors.danger} />
-                        <Text variant="caption" color={colors.danger}>Delete</Text>
-                      </TouchableOpacity>
-                    </View>
-                  </View>
-                </Card>
-              ))
-            )}
-          </View>
-        )}
+              <Text variant="caption" color={colors.primary}>{thread.unread} unread</Text>
+            </View>
+          ))}
+          <Text variant="caption" muted style={{ marginTop: spacing.md }}>The API should return both a stable username and email. Email remains visible to distinguish customers with the same name.</Text>
+        </Card>
+        <Card>
+          <Text variant="heading">Product discounts</Text>
+          {products.map((product) => {
+            const discount = Number(discounts[product.id] || 0)
+            const finalPrice = Math.max(0, product.price * (1 - Math.min(100, discount) / 100))
+            return (
+              <View key={product.id} style={styles.product}>
+                <View style={{ flex: 1 }}><Text variant="label">{product.name}</Text><Text variant="caption" muted>{discount ? `${finalPrice.toLocaleString()} RWF after discount` : `${product.price.toLocaleString()} RWF`}</Text></View>
+                <TextInput value={discounts[product.id] || ''} onChangeText={(value) => setDiscounts((current) => ({ ...current, [product.id]: value.replace(/[^0-9]/g, '') }))} placeholder="%" keyboardType="number-pad" style={styles.discountInput} />
+              </View>
+            )
+          })}
+          <Text variant="caption" muted style={{ marginTop: spacing.md }}>Discount values are shown in the product response so every client can display the same offer.</Text>
+        </Card>
       </ScrollView>
-
-      {/* Product add/edit modal */}
-      <Modal visible={showProductModal} animationType="slide" transparent onRequestClose={() => setShowProductModal(false)}>
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalContent}>
-            <Text variant="heading" center style={{ marginBottom: spacing.lg }}>
-              {editingProduct ? 'Edit Product' : 'Add Product'}
-            </Text>
-            <ScrollView>
-              <Text variant="label" style={styles.fieldLabel}>Product photos</Text>
-              <TouchableOpacity style={styles.imagePicker} onPress={handlePickProductImage} disabled={imageUploading} activeOpacity={0.8}>
-                {imageUploading ? (
-                  <ActivityIndicator color={ACCENT} />
-                ) : productImages.length > 0 ? (
-                  <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.imageGalleryRow}>
-                    {productImages.map((url, index) => (
-                      <Image key={`${url}-${index}`} source={{ uri: url }} style={styles.imagePreview} />
-                    ))}
-                  </ScrollView>
-                ) : (
-                  <View style={{ alignItems: 'center' }}>
-                    <Ionicons name="camera-outline" size={28} color={colors.gray400} />
-                    <Text variant="caption" muted>Tap to add photos</Text>
-                  </View>
-                )}
-              </TouchableOpacity>
-              {productImages.length > 0 && !imageUploading && (
-                <View style={styles.imageActions}>
-                  <TouchableOpacity onPress={handlePickProductImage}>
-                    <Text variant="caption" color={ACCENT} center>Add another photo</Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity onPress={removeLastProductImage}>
-                    <Text variant="caption" color={colors.danger} center>Remove last photo</Text>
-                  </TouchableOpacity>
-                </View>
-              )}
-
-              <Input label="Name" placeholder="Product name" value={productName} onChangeText={setProductName} />
-              <Input label="Description" placeholder="Short description" value={productDescription} onChangeText={setProductDescription} multiline />
-              <Input label="Price (RWF)" placeholder="2500" value={productPrice} onChangeText={setProductPrice} keyboardType="numeric" />
-
-              <Text variant="label" style={styles.fieldLabel}>Category</Text>
-              <View style={styles.tagRow}>
-                {CATEGORIES.map(cat => {
-                  const active = productCategory === cat
-                  return (
-                    <TouchableOpacity
-                      key={cat}
-                      onPress={() => setProductCategory(cat)}
-                      style={[styles.tag, active && { backgroundColor: ACCENT, borderColor: ACCENT }]}
-                    >
-                      <Text variant="caption" color={active ? colors.white : colors.gray700} style={{ textTransform: 'capitalize' }}>
-                        {cat}
-                      </Text>
-                    </TouchableOpacity>
-                  )
-                })}
-              </View>
-
-              <Text variant="label" style={styles.fieldLabel}>Visible to</Text>
-              <Text variant="caption" muted style={{ marginBottom: spacing.sm }}>Choose one or more. Selected tags are highlighted.</Text>
-              <View style={styles.tagRow}>
-                {AUDIENCE_TAGS.map(tag => {
-                  const active = productVisibleTo.includes(tag)
-                  return (
-                    <TouchableOpacity
-                      key={tag}
-                      onPress={() => toggleVisibleTo(tag)}
-                      style={[styles.tag, active && { backgroundColor: ACCENT, borderColor: ACCENT }]}
-                    >
-                      {active && <Ionicons name="checkmark" size={14} color={colors.white} style={{ marginRight: 4 }} />}
-                      <Text variant="caption" color={active ? colors.white : colors.gray700} style={{ textTransform: 'capitalize' }}>
-                        {tag}
-                      </Text>
-                    </TouchableOpacity>
-                  )
-                })}
-              </View>
-
-              <Button title="Save" accent={ACCENT} onPress={saveProduct} style={{ marginTop: spacing.lg }} />
-              <Button title="Cancel" variant="secondary" onPress={() => setShowProductModal(false)} style={{ marginTop: spacing.sm }} />
-            </ScrollView>
-          </View>
-        </View>
-      </Modal>
-
-      {/* Order manage / detail modal */}
-      <Modal visible={!!selectedOrder} animationType="slide" transparent onRequestClose={closeOrderModal}>
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalContent}>
-            {selectedOrder && orderModalMode === 'manage' && (
-              <>
-                <Text variant="heading" center style={{ marginBottom: spacing.md }}>
-                  Manage Order #{selectedOrder.id}
-                </Text>
-                <Text variant="caption" muted style={{ marginBottom: spacing.sm }}>Change status</Text>
-                <View style={styles.statusRow}>
-                  {STATUSES.map(status => {
-                    const active = selectedOrder.status === status
-                    return (
-                      <TouchableOpacity
-                        key={status}
-                        onPress={() => handleChangeStatus(selectedOrder.id, status)}
-                        style={[styles.statusChip, active && { backgroundColor: ACCENT, borderColor: ACCENT }]}
-                      >
-                        <Text variant="caption" color={active ? colors.white : colors.gray700} style={{ textTransform: 'capitalize' }}>
-                          {status}
-                        </Text>
-                      </TouchableOpacity>
-                    )
-                  })}
-                </View>
-                <Button title="Done" accent={ACCENT} onPress={closeOrderModal} style={{ marginTop: spacing.lg }} />
-              </>
-            )}
-
-            {selectedOrder && orderModalMode === 'detail' && (
-              <>
-                <View style={[styles.rowBetween, { marginBottom: spacing.md }]}>
-                  <Text variant="heading">Order #{selectedOrder.id}</Text>
-                  <Badge label={selectedOrder.status} status={selectedOrder.status} />
-                </View>
-                <View style={{ gap: 4 }}>
-                  <Text variant="caption" muted>Customer: {selectedOrder.profiles?.full_name || 'Unknown'}</Text>
-                  <Text variant="caption" muted>Email: {selectedOrder.profiles?.email || '—'}</Text>
-                  <Text variant="caption" muted>Product: {selectedOrder.products?.name || 'Unknown'} × {selectedOrder.quantity}</Text>
-                  <Text variant="caption" muted>Total: {selectedOrder.total_price.toLocaleString()} RWF</Text>
-                  <Text variant="caption" muted>Address: {selectedOrder.delivery_address || '—'}</Text>
-                  <Text variant="caption" muted style={{ textTransform: 'capitalize' }}>Status: {selectedOrder.status}</Text>
-                  <Text variant="caption" muted>Date: {new Date(selectedOrder.created_at).toLocaleString()}</Text>
-                </View>
-                <Button title="Close" variant="secondary" onPress={closeOrderModal} style={{ marginTop: spacing.lg }} />
-              </>
-            )}
-          </View>
-        </View>
-      </Modal>
     </View>
   )
 }
 
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: colors.background },
-  container: { flex: 1 },
-  content: { padding: spacing.lg, paddingBottom: spacing.xxl },
-  rowBetween: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  filterRow: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm, marginBottom: spacing.md },
-  orderBtnRow: { flexDirection: 'row', gap: spacing.sm, marginTop: spacing.md },
-  orderBtn: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 6,
-    paddingVertical: spacing.sm,
-    borderRadius: radius.sm,
-  },
-  statusRow: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
-  statusChip: {
-    paddingHorizontal: spacing.md,
-    paddingVertical: 6,
-    borderRadius: radius.pill,
-    borderWidth: 1,
-    borderColor: colors.border,
-  },
-  fieldLabel: { color: colors.gray700, marginBottom: spacing.xs },
-  tagRow: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm, marginBottom: spacing.md },
-  tag: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: spacing.md,
-    paddingVertical: 8,
-    borderRadius: radius.pill,
-    borderWidth: 1,
-    borderColor: colors.border,
-  },
-  productCard: { flexDirection: 'row', gap: spacing.md },
-  thumb: { width: 48, height: 48, borderRadius: radius.md, alignItems: 'center', justifyContent: 'center' },
-  imagePicker: {
-    height: 140,
-    borderRadius: radius.md,
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderStyle: 'dashed',
-    backgroundColor: colors.gray100,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: spacing.sm,
-    overflow: 'hidden',
-  },
-  imageGalleryRow: {
-    alignItems: 'center',
-    gap: spacing.sm,
-  },
-  imagePreview: { width: 160, height: 140, resizeMode: 'cover' },
-  imageActions: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginBottom: spacing.md,
-  },
-  productActions: { flexDirection: 'row', gap: spacing.sm, marginTop: spacing.sm },
-  smallBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    paddingHorizontal: spacing.md,
-    paddingVertical: 6,
-    borderRadius: radius.sm,
-  },
-  modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', padding: spacing.lg },
-  modalContent: { backgroundColor: colors.surface, borderRadius: radius.lg, padding: spacing.xl, maxHeight: '85%' },
+  content: { padding: spacing.lg, gap: spacing.lg, paddingBottom: spacing.xxl },
+  thread: { flexDirection: 'row', alignItems: 'center', gap: spacing.md, paddingVertical: spacing.md, borderBottomWidth: 1, borderBottomColor: colors.gray100 },
+  product: { flexDirection: 'row', alignItems: 'center', gap: spacing.md, paddingVertical: spacing.sm },
+  discountInput: { width: 58, borderWidth: 1, borderColor: colors.border, borderRadius: radius.md, padding: spacing.sm, textAlign: 'center', color: colors.text },
 })
