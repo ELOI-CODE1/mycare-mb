@@ -1,6 +1,5 @@
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react'
-import * as SecureStore from 'expo-secure-store'
-import { api, apiErrorMessage, TOKEN_KEY } from '../api/client'
+import { api, apiErrorMessage, getAccessToken, setAccessToken, clearAccessToken } from '../api/client'
 
 export type Role = 'girl' | 'boy' | 'parent' | 'admin'
 export type User = { id: string; email: string; fullName: string; phone: string | null; role: Role; status: 'active' | 'suspended' | 'deleted'; createdAt: string }
@@ -20,13 +19,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [loading, setLoading] = useState(true)
 
   const logout = useCallback(async () => {
-    await SecureStore.deleteItemAsync(TOKEN_KEY)
+    await clearAccessToken()
     setUser(null)
   }, [])
 
   useEffect(() => {
     let mounted = true
-    SecureStore.getItemAsync(TOKEN_KEY)
+    getAccessToken()
       .then(async (token) => {
         if (!token) return
         const response = await api.get<{ user: User }>('/auth/me')
@@ -40,7 +39,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const login = useCallback(async (email: string, password: string) => {
     try {
       const response = await api.post<{ token: string; user: User }>('/auth/login', { email, password })
-      await SecureStore.setItemAsync(TOKEN_KEY, response.data.token)
+      await setAccessToken(response.data.token)
       setUser(response.data.user)
     } catch (error) { throw new Error(apiErrorMessage(error, 'Login failed.')) }
   }, [])
@@ -48,7 +47,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const signup = useCallback(async (input: { fullName: string; email: string; password: string; phone?: string; role: Exclude<Role, 'admin'> }) => {
     try {
       const response = await api.post<{ token: string; user: User }>('/auth/signup', input)
-      await SecureStore.setItemAsync(TOKEN_KEY, response.data.token)
+      await setAccessToken(response.data.token)
       setUser(response.data.user)
     } catch (error) { throw new Error(apiErrorMessage(error, 'Registration failed.')) }
   }, [])

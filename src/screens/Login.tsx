@@ -13,15 +13,21 @@ export default function Login({ navigation }: Props) {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [loading, setLoading] = useState(false)
+  const [errorMessage, setErrorMessage] = useState('')
 
   const handleLogin = async () => {
     if (!email || !password) {
-      Alert.alert('Error', 'Please enter email and password')
+      setErrorMessage('Please enter email and password.')
       return
     }
+    setErrorMessage('')
     setLoading(true)
     try { await login(email.trim(), password) }
-    catch (error) { Alert.alert('Login failed', error instanceof Error ? error.message : 'Please try again.') }
+    catch (error) {
+      const message = error instanceof Error ? error.message : 'Unknown login error.'
+      setErrorMessage(message)
+      Alert.alert('Login failed', message)
+    }
     finally { setLoading(false) }
   }
 
@@ -59,6 +65,7 @@ export default function Login({ navigation }: Props) {
         </TouchableOpacity>
 
         <Button title="Login" onPress={handleLogin} loading={loading} />
+        {errorMessage ? <Text color="#B91C1C" style={{ marginTop: spacing.md, textAlign: 'center' }}>{errorMessage}</Text> : null}
 
         <TouchableOpacity
           style={{ marginTop: spacing.xl, alignItems: 'center' }}

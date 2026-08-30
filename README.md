@@ -17,4 +17,4 @@ npm start
 
 ## Connecting your backend
 
-When your separate backend is ready, add a frontend API layer that calls its endpoints. Keep server secrets and privileged credentials exclusively in that backend; only public configuration should be included in the Expo app.
+When your separate backend is ready, create `.env` from `.env.example`. For Expo Web on the same PC, use `http://127.0.0.1:3000/api`. For a physical phone, replace `127.0.0.1` with the computer's LAN IP address. Keep server secrets and privileged credentials exclusively in the backend; only public configuration should be included in the Expo app.
