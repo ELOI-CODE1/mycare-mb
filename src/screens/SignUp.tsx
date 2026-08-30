@@ -5,6 +5,7 @@ import { Text, Input, Button, Card, Screen } from '../components/ui'
 import { colors, spacing, radius } from '../theme'
 import { validateStepOne, validateStepTwo, FormErrors } from '../utils/validation'
 import type { RootStackParamList } from '../navigation/RootNavigator'
+import { useAuth } from '../context/AuthContext'
 
 type Props = NativeStackScreenProps<RootStackParamList, 'SignUp'>
 
@@ -28,6 +29,7 @@ export const questions = [
 ]
 
 export default function SignUp({ navigation }: Props) {
+  const { signup } = useAuth()
   const [step, setStep] = useState(0)
 
   // Form State
@@ -67,9 +69,11 @@ export default function SignUp({ navigation }: Props) {
     if (!isValid) return
 
     setLoading(true)
-    setLoading(false)
-    Alert.alert('Registration unavailable', 'Connect your new backend API to enable account registration.')
-    navigation.navigate('Login')
+    try {
+      await signup({ fullName: fullName.trim(), email: email.trim(), password, phone: phone.trim(), role: determineRole(answers) })
+    } catch (error) {
+      Alert.alert('Registration failed', error instanceof Error ? error.message : 'Please try again.')
+    } finally { setLoading(false) }
   }
 
   // Step 0: User Credentials (card layout)

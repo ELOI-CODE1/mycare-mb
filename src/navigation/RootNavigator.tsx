@@ -9,6 +9,9 @@ import GirlDashboard from '../screens/GirlDashboard'
 import BoyDashboard from '../screens/BoyDashboard'
 import ParentDashboard from '../screens/ParentDashboard'
 import AdminDashboard from '../screens/AdminDashboard'
+import { ActivityIndicator, View } from 'react-native'
+import { useAuth } from '../context/AuthContext'
+import { colors } from '../theme'
 
 export type RootStackParamList = {
   Login: undefined
@@ -24,16 +27,15 @@ export type RootStackParamList = {
 const Stack = createNativeStackNavigator<RootStackParamList>()
 
 export default function RootNavigator() {
+  const { user, loading } = useAuth()
+  if (loading) return <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.background }}><ActivityIndicator color={colors.primary} /></View>
   return (
     <Stack.Navigator screenOptions={{ headerShown: false }}>
-      <Stack.Screen name="Login" component={Login} />
-      <Stack.Screen name="SignUp" component={SignUp} />
-      <Stack.Screen name="ResetPassword" component={ResetPassword} />
-      <Stack.Screen name="RoleGateway" component={RoleGateway} />
-      <Stack.Screen name="GirlDashboard" component={GirlDashboard} />
-      <Stack.Screen name="BoyDashboard" component={BoyDashboard} />
-      <Stack.Screen name="ParentDashboard" component={ParentDashboard} />
-      <Stack.Screen name="AdminDashboard" component={AdminDashboard} />
+      {!user ? <>
+        <Stack.Screen name="Login" component={Login} />
+        <Stack.Screen name="SignUp" component={SignUp} />
+        <Stack.Screen name="ResetPassword" component={ResetPassword} />
+      </> : user.role === 'admin' ? <Stack.Screen name="AdminDashboard" component={AdminDashboard} /> : <Stack.Screen name="RoleGateway" component={RoleGateway} />}
     </Stack.Navigator>
   )
 }

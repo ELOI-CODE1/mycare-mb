@@ -1,5 +1,9 @@
 # API integration points
 
+Set `EXPO_PUBLIC_API_URL` in a local `.env` file. Use the backend machine's LAN
+address when testing on a physical phone, or the emulator-specific host address
+when testing in an Android emulator. Never put Paypack credentials in this app.
+
 The screens intentionally contain no database client. Connect the separate backend through a small API client and map its responses to the types in `types.ts`.
 
 The required response fields are:

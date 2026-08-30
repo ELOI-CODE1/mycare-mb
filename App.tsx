@@ -7,6 +7,7 @@ import { NavigationContainer } from '@react-navigation/native'
 import { StatusBar } from 'expo-status-bar'
 import * as SplashScreen from 'expo-splash-screen'
 import { CartProvider } from './src/context/CartContext'
+import { AuthProvider } from './src/context/AuthContext'
 import RootNavigator from './src/navigation/RootNavigator'
 
 SplashScreen.preventAutoHideAsync().catch(() => undefined)
@@ -34,12 +35,14 @@ export default function App() {
     <>
       <GestureHandlerRootView style={{ flex: 1 }}>
         <SafeAreaProvider>
-          <CartProvider>
-            <NavigationContainer>
-              <StatusBar style="dark" />
-              <RootNavigator />
-            </NavigationContainer>
-          </CartProvider>
+          <AuthProvider>
+            <CartProvider>
+              <NavigationContainer>
+                <StatusBar style="dark" />
+                <RootNavigator />
+              </NavigationContainer>
+            </CartProvider>
+          </AuthProvider>
         </SafeAreaProvider>
       </GestureHandlerRootView>
 

@@ -3,11 +3,13 @@ import { View, Alert, TouchableOpacity } from 'react-native'
 import type { NativeStackScreenProps } from '@react-navigation/native-stack'
 import { Screen, Text, Input, Button } from '../components/ui'
 import { colors, spacing } from '../theme'
+import { useAuth } from '../context/AuthContext'
 import type { RootStackParamList } from '../navigation/RootNavigator'
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Login'>
 
 export default function Login({ navigation }: Props) {
+  const { login } = useAuth()
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [loading, setLoading] = useState(false)
@@ -18,8 +20,9 @@ export default function Login({ navigation }: Props) {
       return
     }
     setLoading(true)
-    setLoading(false)
-    Alert.alert('Login unavailable', 'Connect your new backend API to enable login.')
+    try { await login(email.trim(), password) }
+    catch (error) { Alert.alert('Login failed', error instanceof Error ? error.message : 'Please try again.') }
+    finally { setLoading(false) }
   }
 
   return (
@@ -56,8 +59,6 @@ export default function Login({ navigation }: Props) {
         </TouchableOpacity>
 
         <Button title="Login" onPress={handleLogin} loading={loading} />
-
-        <Button title="Preview role dashboards" variant="secondary" onPress={() => navigation.navigate('RoleGateway')} style={{ marginTop: spacing.sm }} />
 
         <TouchableOpacity
           style={{ marginTop: spacing.xl, alignItems: 'center' }}

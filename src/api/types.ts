@@ -30,7 +30,7 @@ export type CreateAccountPayload = {
 }
 
 export type CreateOrderPayload = {
-  items: Array<{ productId: number | string; quantity: number }>
+  items: Array<{ productId: number; quantity: number }>
   deliveryAddress: string
   contactPhone: string
 }
