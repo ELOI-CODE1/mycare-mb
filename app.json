@@ -6,11 +6,6 @@
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
-    "splash": {
-      "image": "./assets/logo.png",
-      "resizeMode": "contain",
-      "backgroundColor": "#E6F4FE"
-    },
     "ios": {
       "supportsTablet": true
     },
@@ -33,7 +28,18 @@
         {
           "photosPermission": "MyCare+ needs access to your photos so you can set a product or profile picture."
         }
-      ]
+      ],
+      [
+        "expo-splash-screen",
+        {
+          "image": "./assets/logo.png",
+          "resizeMode": "contain",
+          "backgroundColor": "#E6F4FE",
+          "imageWidth": 200
+        }
+      ],
+      "expo-status-bar",
+      "expo-font"
     ]
   }
 }
