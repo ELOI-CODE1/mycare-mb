@@ -35,7 +35,12 @@ export default function RootNavigator() {
         <Stack.Screen name="Login" component={Login} />
         <Stack.Screen name="SignUp" component={SignUp} />
         <Stack.Screen name="ResetPassword" component={ResetPassword} />
-      </> : user.role === 'admin' ? <Stack.Screen name="AdminDashboard" component={AdminDashboard} /> : <Stack.Screen name="RoleGateway" component={RoleGateway} />}
+      </> : user.role === 'admin' ? <Stack.Screen name="AdminDashboard" component={AdminDashboard} /> : <>
+        <Stack.Screen name="RoleGateway" component={RoleGateway} />
+        <Stack.Screen name="GirlDashboard" component={GirlDashboard} />
+        <Stack.Screen name="BoyDashboard" component={BoyDashboard} />
+        <Stack.Screen name="ParentDashboard" component={ParentDashboard} />
+      </>}
     </Stack.Navigator>
   )
 }
