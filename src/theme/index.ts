@@ -6,26 +6,26 @@ export type Role = 'girl' | 'boy' | 'parent' | 'admin'
 
 const palette = {
   // Brand + role accents
-  pink: '#e91e63',
-  pinkSoft: '#fce4ec',
-  blue: '#2196f3',
-  blueSoft: '#e3f2fd',
-  green: '#4caf50',
-  greenSoft: '#e8f5e9',
-  red: '#f44336',
-  redSoft: '#ffebee',
+  pink: '#c94f78',
+  pinkSoft: '#f8e7ed',
+  blue: '#2f6f95',
+  blueSoft: '#e5f0f5',
+  green: '#3e8066',
+  greenSoft: '#e5f1eb',
+  red: '#b65353',
+  redSoft: '#f8e8e8',
 
   // Neutrals
-  black: '#1a1a1a',
-  ink: '#222222',
-  gray700: '#444444',
-  gray500: '#777777',
-  gray400: '#999999',
-  gray300: '#cccccc',
-  gray200: '#e0e0e0',
-  gray100: '#f0f0f0',
+  black: '#17211f',
+  ink: '#24312e',
+  gray700: '#4c5a56',
+  gray500: '#71807b',
+  gray400: '#9aa6a2',
+  gray300: '#c9d1ce',
+  gray200: '#e2e8e5',
+  gray100: '#f1f4f2',
   surface: '#ffffff',
-  background: '#f5f5f7',
+  background: '#f4f6f3',
   white: '#ffffff',
 
   // Status
@@ -47,15 +47,15 @@ export const spacing = {
   xs: 4,
   sm: 8,
   md: 12,
-  lg: 16,
-  xl: 24,
-  xxl: 32,
+  lg: 18,
+  xl: 26,
+  xxl: 36,
 } as const
 
 export const radius = {
-  sm: 8,
-  md: 12,
-  lg: 16,
+  sm: 7,
+  md: 11,
+  lg: 15,
   pill: 999,
 } as const
 
@@ -64,9 +64,9 @@ export const fontSize = {
   sm: 14,
   md: 16,
   lg: 18,
-  xl: 22,
-  xxl: 28,
-  display: 36,
+  xl: 21,
+  xxl: 30,
+  display: 38,
 } as const
 
 export const fontWeight = {
@@ -79,10 +79,10 @@ export const fontWeight = {
 export const shadow = {
   card: {
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.08,
-    shadowRadius: 6,
-    elevation: 2,
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 5,
+    elevation: 1,
   },
 } as const
 

@@ -5,9 +5,6 @@ import Login from '../screens/Login'
 import SignUp from '../screens/SignUp'
 import ResetPassword from '../screens/ResetPassword'
 import RoleGateway from '../screens/RoleGateway'
-import GirlDashboard from '../screens/GirlDashboard'
-import BoyDashboard from '../screens/BoyDashboard'
-import ParentDashboard from '../screens/ParentDashboard'
 import AdminDashboard from '../screens/AdminDashboard'
 import { ActivityIndicator, View } from 'react-native'
 import { useAuth } from '../context/AuthContext'
@@ -35,12 +32,7 @@ export default function RootNavigator() {
         <Stack.Screen name="Login" component={Login} />
         <Stack.Screen name="SignUp" component={SignUp} />
         <Stack.Screen name="ResetPassword" component={ResetPassword} />
-      </> : user.role === 'admin' ? <Stack.Screen name="AdminDashboard" component={AdminDashboard} /> : <>
-        <Stack.Screen name="RoleGateway" component={RoleGateway} />
-        <Stack.Screen name="GirlDashboard" component={GirlDashboard} />
-        <Stack.Screen name="BoyDashboard" component={BoyDashboard} />
-        <Stack.Screen name="ParentDashboard" component={ParentDashboard} />
-      </>}
+      </> : user.role === 'admin' ? <Stack.Screen name="AdminDashboard" component={AdminDashboard} /> : <Stack.Screen name="RoleGateway" component={RoleGateway} />}
     </Stack.Navigator>
   )
 }
