@@ -56,21 +56,21 @@ export default function ProductCard({ name, price, description, category, image,
 }
 
 const styles = StyleSheet.create({
-  card: { flexDirection: 'row', alignItems: 'center' },
-  content: { flexDirection: 'row', alignItems: 'center', flex: 1, marginRight: spacing.sm },
+  card: { flex: 1, minWidth: 0, marginBottom: 0 },
+  content: { flex: 1, marginBottom: spacing.sm },
   thumb: {
-    width: 54,
-    height: 54,
+    width: '100%',
+    aspectRatio: 1.15,
     borderRadius: radius.md,
   },
   thumbFallback: {
     alignItems: 'center',
     justifyContent: 'center',
   },
-  info: { flex: 1 },
+  info: { flex: 1, paddingTop: spacing.sm },
   addBtn: {
-    width: 40,
-    height: 40,
+    width: 36,
+    height: 36,
     borderRadius: radius.pill,
     alignItems: 'center',
     justifyContent: 'center',

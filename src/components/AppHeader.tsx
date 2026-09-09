@@ -11,7 +11,8 @@ export default function AppHeader({ role, title = 'Home', showCart = false }: { 
   const insets = useSafeAreaInsets()
   const navigation = useNavigation<any>()
   const { user } = useAuth()
-  const firstName = user?.fullName?.split(' ')[0] || 'there'
+  const rawFirstName = user?.fullName?.split(' ')[0]
+  const firstName = rawFirstName && rawFirstName.toLowerCase() !== 'string' ? rawFirstName : 'there'
   const initials = user?.fullName?.split(' ').map((part) => part[0]).join('').slice(0, 2).toUpperCase() || 'MC'
   const navigateIfAvailable = (route: string, fallback: string) => {
     const routeNames = navigation.getState()?.routeNames || []
@@ -37,8 +38,8 @@ export default function AppHeader({ role, title = 'Home', showCart = false }: { 
           <Ionicons name="notifications-outline" size={20} color={colors.ink} />
           <View style={styles.notificationDot} />
         </Pressable>
-        <Pressable accessibilityLabel="Open profile" onPress={() => navigateIfAvailable('Profile', 'Profile details are managed from this account screen.')} style={[styles.avatar, { backgroundColor: roleAccent(role) }]}>
-          <Text variant="label" color={colors.white}>{initials}</Text>
+        <Pressable accessibilityLabel={role === 'admin' ? 'Open admin settings' : 'Open profile'} onPress={() => navigateIfAvailable(role === 'admin' ? 'Settings' : 'Profile', role === 'admin' ? 'Admin settings are not available in this account.' : 'Profile details are managed from this account screen.')} style={[styles.avatar, { backgroundColor: roleAccent(role) }]}>
+          <Ionicons name={role === 'admin' ? 'settings-outline' : 'person-outline'} size={19} color={colors.white} />
         </Pressable>
       </View>
     </View>

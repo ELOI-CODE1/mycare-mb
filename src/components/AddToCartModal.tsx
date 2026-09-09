@@ -29,12 +29,14 @@ export default function AddToCartModal({ visible, onClose, product, accent = col
   const { addItem } = useCart()
   const [quantity, setQuantity] = useState(1)
   const [activeImageIndex, setActiveImageIndex] = useState(0)
+  const [fullImageVisible, setFullImageVisible] = useState(false)
 
   // Reset quantity each time the modal opens.
   useEffect(() => {
     if (visible) {
       setQuantity(1)
       setActiveImageIndex(0)
+      setFullImageVisible(false)
     }
   }, [visible, product?.id])
 
@@ -75,7 +77,9 @@ export default function AddToCartModal({ visible, onClose, product, accent = col
                 }}
               >
                 {images.map((url, index) => (
-                  <Image key={`${product.id}-${index}`} source={{ uri: url }} style={styles.galleryImage} />
+                  <Pressable key={`${product.id}-${index}`} onPress={() => setFullImageVisible(true)} accessibilityLabel="View product image full screen">
+                    <Image source={{ uri: url }} style={styles.galleryImage} />
+                  </Pressable>
                 ))}
               </ScrollView>
               {images.length > 1 ? (
@@ -85,8 +89,11 @@ export default function AddToCartModal({ visible, onClose, product, accent = col
                   ))}
                 </View>
               ) : null}
+              <View style={styles.imageHint}><Ionicons name="expand-outline" size={14} color={colors.gray700} /><Text variant="caption" muted>Tap image to view full screen</Text></View>
             </View>
           ) : null}
+
+          {images.length > 1 ? <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.thumbnailRow}>{images.map((url, index) => <TouchableOpacity key={`thumb-${url}`} onPress={() => setActiveImageIndex(index)} style={[styles.thumbnail, index === activeImageIndex && { borderColor: accent }]}><Image source={{ uri: url }} style={styles.thumbnailImage} /></TouchableOpacity>)}</ScrollView> : null}
 
           <View style={styles.detailsBox}>
             {product.description ? <Text variant="caption" muted>{product.description}</Text> : null}
@@ -136,6 +143,12 @@ export default function AddToCartModal({ visible, onClose, product, accent = col
           </TouchableOpacity>
         </Pressable>
       </Pressable>
+      <Modal visible={fullImageVisible} animationType="fade" presentationStyle="fullScreen" onRequestClose={() => setFullImageVisible(false)}>
+        <View style={styles.fullscreenViewer}>
+          <Pressable accessibilityLabel="Close full screen image" onPress={() => setFullImageVisible(false)} style={styles.fullscreenClose}><Ionicons name="close" size={26} color={colors.white} /></Pressable>
+          {images[activeImageIndex] ? <Image source={{ uri: images[activeImageIndex] }} style={styles.fullscreenImage} resizeMode="contain" /> : null}
+        </View>
+      </Modal>
     </Modal>
   )
 }
@@ -164,10 +177,17 @@ const styles = StyleSheet.create({
     backgroundColor: colors.gray100,
   },
   galleryImage: {
-    width: 260,
-    height: 180,
+    width: 320,
+    height: 230,
     resizeMode: 'cover',
   },
+  imageHint: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: spacing.xs, paddingVertical: spacing.sm },
+  thumbnailRow: { gap: spacing.sm, paddingBottom: spacing.md },
+  thumbnail: { width: 58, height: 58, borderRadius: radius.sm, borderWidth: 2, borderColor: 'transparent', overflow: 'hidden' },
+  thumbnailImage: { width: '100%', height: '100%' },
+  fullscreenViewer: { flex: 1, backgroundColor: '#101514', justifyContent: 'center', alignItems: 'center' },
+  fullscreenImage: { width: '100%', height: '82%' },
+  fullscreenClose: { position: 'absolute', top: 48, right: 20, zIndex: 2, width: 42, height: 42, borderRadius: 21, backgroundColor: 'rgba(255,255,255,0.16)', alignItems: 'center', justifyContent: 'center' },
   dotRow: {
     flexDirection: 'row',
     justifyContent: 'center',

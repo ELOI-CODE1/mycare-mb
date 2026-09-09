@@ -151,10 +151,10 @@ function ShopTab({ role }: { role: TabRole }) {
           {products === null && !error ? <ActivityIndicator color={accent} style={{ marginVertical: spacing.xl }} /> : null}
           {error ? <Text color={colors.danger} style={{ marginTop: spacing.lg }}>{error}</Text> : null}
           {products?.length === 0 ? <EmptyState icon="bag-outline" title="No products yet" subtitle="Your care shop will appear here when products are available." /> : null}
-          {products?.map((product) => {
+          <View style={styles.productGrid}>{products?.map((product) => {
             const normalizedProduct = { ...product, id: Number(product.id), image_url: product.imageUrl, images: product.imageUrls }
             return <ProductCard key={product.id} name={product.name} price={product.price} description={product.description} category={product.category} image={product.imageUrl} images={product.imageUrls} discountPercent={product.discountPercent} accent={accent} soft={roleColors[role].soft} onPress={() => setSelectedProduct(normalizedProduct)} onAdd={() => setSelectedProduct(normalizedProduct)} />
-          })}
+          })}</View>
         </Card>
       </ScrollView>
       <AddToCartModal visible={Boolean(selectedProduct)} onClose={() => setSelectedProduct(null)} product={selectedProduct} accent={accent} />
@@ -301,6 +301,7 @@ type Order = {
 function OrdersTab({ role }: { role: TabRole }) {
   const [orders, setOrders] = useState<Order[] | null>(null)
   const [error, setError] = useState('')
+  const { checkoutCount } = useCart()
 
   useFocusEffect(
     useCallback(() => {
@@ -312,7 +313,7 @@ function OrdersTab({ role }: { role: TabRole }) {
         .then((response) => { if (alive) setOrders(response.data.orders) })
         .catch((err) => { if (alive) setError(apiErrorMessage(err, 'Could not load orders.')) })
       return () => { alive = false }
-    }, []),
+    }, [checkoutCount]),
   )
 
   return (
@@ -432,6 +433,7 @@ const styles = StyleSheet.create({
   heroMark: { width: 66, height: 66, borderRadius: 33, alignItems: 'center', justifyContent: 'center', marginBottom: spacing.xs },
   sectionHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   metricGrid: { flexDirection: 'row', gap: spacing.md },
+  productGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.md, marginTop: spacing.lg },
   metricTile: { flex: 1, minHeight: 132 },
   metricIcon: { width: 36, height: 36, borderRadius: 18, alignItems: 'center', justifyContent: 'center' },
   insightCard: { flexDirection: 'row', alignItems: 'center', gap: spacing.md },

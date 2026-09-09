@@ -77,13 +77,16 @@ export default function GirlCyclePanel({ accent }: { accent: string }) {
       </View>
       <Text variant="heading" style={{ marginTop: spacing.xl }}>Record a period</Text>
       <Text variant="caption" muted style={{ marginTop: spacing.xs }}>Enter the first day and how many days it lasted. The calendar below is for viewing only.</Text>
-      <View style={styles.formRow}>
-        <View style={styles.formField}><Text variant="caption" muted>First day</Text><TextInput value={startDate} onChangeText={setStartDate} placeholder="YYYY-MM-DD" placeholderTextColor={colors.gray400} style={styles.input} /></View>
-        <View style={styles.durationField}><Text variant="caption" muted>Days</Text><TextInput value={duration} onChangeText={setDuration} keyboardType="number-pad" style={styles.input} /></View>
+      <View style={[styles.formPanel, { borderColor: `${accent}55` }]}>
+        <View style={styles.formRow}>
+          <View style={styles.formField}><Text variant="caption" muted>First day</Text><TextInput value={startDate} onChangeText={setStartDate} placeholder="YYYY-MM-DD" placeholderTextColor={colors.gray400} style={styles.input} /></View>
+          <View style={styles.durationField}><Text variant="caption" muted>Days</Text><TextInput value={duration} onChangeText={setDuration} keyboardType="number-pad" style={styles.input} /></View>
+        </View>
+        {formError ? <Text variant="caption" color={colors.danger}>{formError}</Text> : null}
+        <Button title="Save period" onPress={saveLog} accent={accent} style={{ marginTop: spacing.sm }} />
       </View>
-      {formError ? <Text variant="caption" color={colors.danger}>{formError}</Text> : null}
-      <Button title="Save period" onPress={saveLog} accent={accent} />
       <Text variant="heading" style={{ marginTop: spacing.xl }}>Cycle calendar</Text>
+      <View style={styles.legend}><View style={styles.legendItem}><View style={[styles.legendDot, { backgroundColor: accent }]} /><Text variant="caption" muted>Logged period</Text></View><View style={styles.legendItem}><View style={[styles.legendDot, { backgroundColor: colors.surface, borderColor: accent, borderWidth: 2 }]} /><Text variant="caption" muted>Predicted window</Text></View></View>
       <Calendar
         markedDates={markedDates}
         theme={{ todayTextColor: accent, arrowColor: accent, selectedDayBackgroundColor: accent, monthTextColor: colors.text, textSectionTitleColor: colors.gray700 }}
@@ -99,6 +102,10 @@ const styles = StyleSheet.create({
   formRow: { flexDirection: 'row', gap: spacing.md, marginTop: spacing.md, marginBottom: spacing.sm },
   formField: { flex: 1 },
   durationField: { width: 88 },
+  formPanel: { marginTop: spacing.md, padding: spacing.md, borderWidth: 1, borderRadius: radius.lg, backgroundColor: colors.gray100 },
   input: { borderWidth: 1, borderColor: colors.border, borderRadius: radius.md, paddingHorizontal: spacing.md, paddingVertical: spacing.sm, marginTop: spacing.xs, color: colors.text, backgroundColor: colors.gray100 },
   calendar: { marginTop: spacing.md, borderRadius: radius.md },
+  legend: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.lg, marginTop: spacing.md },
+  legendItem: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs },
+  legendDot: { width: 12, height: 12, borderRadius: 6 },
 })

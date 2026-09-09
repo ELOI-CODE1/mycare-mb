@@ -43,6 +43,7 @@ export default function SignUp({ navigation }: Props) {
   // Errors & Loading State
   const [errors, setErrors] = useState<FormErrors>({})
   const [loading, setLoading] = useState(false)
+  const [submitError, setSubmitError] = useState('')
 
   // Handle Step 1 Next
   const handleNextStep = () => {
@@ -68,11 +69,12 @@ export default function SignUp({ navigation }: Props) {
 
     if (!isValid) return
 
+    setSubmitError('')
     setLoading(true)
     try {
       await signup({ fullName: fullName.trim(), email: email.trim(), password, phone: phone.trim(), role: determineRole(answers) })
     } catch (error) {
-      Alert.alert('Registration failed', error instanceof Error ? error.message : 'Please try again.')
+      setSubmitError(error instanceof Error ? error.message : 'Registration could not be completed. Please try again.')
     } finally { setLoading(false) }
   }
 
@@ -172,11 +174,10 @@ export default function SignUp({ navigation }: Props) {
   if (step === 1 && !loading) {
     return (
       <Screen scroll padded={false} background={colors.background}>
-        <View style={styles.topHeaderSmall}>
-          <Text variant="heading">Tell Us About Yourself</Text>
-          <Text variant="caption" muted style={{ marginTop: spacing.xs }}>
-            A few quick questions to tailor your experience.
-          </Text>
+        <View style={styles.stepIntro}>
+          <View style={styles.stepEyebrow}><View style={styles.stepDot} /><Text variant="caption" color={colors.primary}>STEP 2 OF 2</Text></View>
+          <Text variant="title" style={styles.stepTitle}>Tell us about yourself</Text>
+          <Text variant="body" muted style={styles.stepSubtitle}>Help us shape a more personal care experience.</Text>
         </View>
 
         <Card style={styles.card}>
@@ -213,9 +214,7 @@ export default function SignUp({ navigation }: Props) {
           })}
 
           <Button title="Complete Registration" onPress={handleSignUp} style={{ marginTop: spacing.lg }} />
-          <Text variant="caption" muted center style={{ marginTop: spacing.md }}>
-            Your new backend will send a verification code to confirm this account.
-          </Text>
+          {submitError ? <Text color={colors.danger} style={styles.submitError}>{submitError}</Text> : null}
 
           <TouchableOpacity onPress={() => setStep(0)} style={styles.backButton}>
             <Text muted>Back</Text>
@@ -281,6 +280,11 @@ const styles = StyleSheet.create({
   topHeader: { marginTop: spacing.xl, marginBottom: spacing.md, paddingHorizontal: spacing.lg },
   topTitle: { textAlign: 'center', color: colors.primary },
   topSubtitle: { textAlign: 'center' },
-  topHeaderSmall: { marginBottom: spacing.md, paddingHorizontal: spacing.lg },
+  stepIntro: { marginTop: spacing.xxl, marginBottom: spacing.xl, paddingHorizontal: spacing.lg },
+  stepEyebrow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, marginBottom: spacing.md },
+  stepDot: { width: 8, height: 8, borderRadius: 4, backgroundColor: colors.primary },
+  stepTitle: { color: colors.ink, maxWidth: 320 },
+  stepSubtitle: { marginTop: spacing.sm, lineHeight: 23, maxWidth: 320 },
+  submitError: { marginTop: spacing.md, textAlign: 'center', lineHeight: 19 },
   card: { marginHorizontal: spacing.lg },
 })
