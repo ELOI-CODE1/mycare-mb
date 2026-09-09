@@ -1,5 +1,5 @@
 import React, { useCallback, useState } from 'react'
-import { ActivityIndicator, ScrollView, StyleSheet, View } from 'react-native'
+import { ActivityIndicator, Modal, Pressable, ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native'
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs'
 import { useFocusEffect } from '@react-navigation/native'
 import { Ionicons } from '@expo/vector-icons'
@@ -10,10 +10,12 @@ import AddToCartModal from '../components/AddToCartModal'
 import GirlCyclePanel from '../components/GirlCyclePanel'
 import OrderCheckoutPanel from '../components/OrderCheckoutPanel'
 import OrderCard from '../components/OrderCard'
+import MessagePanel from '../components/MessagePanel'
 import { useAuth } from '../context/AuthContext'
+import { useCart } from '../context/CartContext'
 import { api, apiErrorMessage } from '../api/client'
 import type { ApiProduct } from '../api/types'
-import { colors, roleColors, spacing } from '../theme'
+import { colors, radius, roleColors, spacing } from '../theme'
 
 export type TabRole = 'girl' | 'boy' | 'parent'
 
@@ -26,6 +28,8 @@ const TAB_META: Record<string, { label: string; icon: keyof typeof Ionicons.glyp
   Shop: { label: 'Shop', icon: 'bag', outline: 'bag-outline' },
   Orders: { label: 'Orders', icon: 'receipt', outline: 'receipt-outline' },
   Profile: { label: 'Profile', icon: 'person', outline: 'person-outline' },
+  Cart: { label: 'Cart', icon: 'bag-handle', outline: 'bag-handle-outline' },
+  Messages: { label: 'Messages', icon: 'chatbubble-ellipses', outline: 'chatbubble-ellipses-outline' },
 }
 
 function TabScreen({ children }: { children: React.ReactNode }) {
@@ -49,7 +53,8 @@ function HomeTab({ role, title, description }: { role: TabRole; title: string; d
             <Ionicons name={isGirl ? 'flower-outline' : role === 'parent' ? 'people-outline' : 'shield-checkmark-outline'} size={28} color={colors.white} />
           </View>
         </Card>
-        {role === 'girl' ? <GirlCyclePanel accent={accent} /> : null}
+        {role === 'girl' ? <GirlCyclePanel accent={accent} /> : <RoleHealthCard role={role} accent={accent} />}
+        {role === 'parent' ? <ChildrenSummary accent={accent} /> : null}
         <View style={styles.sectionHeader}>
           <Text variant="heading">Your snapshot</Text>
           <Text variant="caption" color={accent}>View details</Text>
@@ -70,6 +75,38 @@ function HomeTab({ role, title, description }: { role: TabRole; title: string; d
         </Card>
       </ScrollView>
     </TabScreen>
+  )
+}
+
+function RoleHealthCard({ role, accent }: { role: Exclude<TabRole, 'girl'>; accent: string }) {
+  const isParent = role === 'parent'
+  return (
+    <Card>
+      <Text variant="caption" color={accent}>{isParent ? 'FAMILY WELLNESS' : 'YOUR WELLNESS'}</Text>
+      <Text variant="heading" style={{ marginTop: spacing.xs }}>{isParent ? 'Stay close to the care that matters.' : 'Small steps, stronger health.'}</Text>
+      <Text muted style={{ marginTop: spacing.sm, lineHeight: 21 }}>{isParent ? 'Keep your family care details, reminders, and supplies in one calm place.' : 'Build a private health picture with check-ins, education, and timely reminders.'}</Text>
+      <View style={styles.healthActionRow}>
+        <HealthStat label={isParent ? 'Children' : 'Check-ins'} value={isParent ? 'Add a profile' : 'Start today'} accent={accent} />
+        <HealthStat label={isParent ? 'Reminders' : 'Education'} value={isParent ? 'None set' : 'Explore topics'} accent={accent} />
+      </View>
+    </Card>
+  )
+}
+
+function HealthStat({ label, value, accent }: { label: string; value: string; accent: string }) {
+  return <View style={styles.healthStat}><Text variant="caption" muted>{label}</Text><Text variant="label" color={accent} style={{ marginTop: spacing.xs }}>{value}</Text></View>
+}
+
+function ChildrenSummary({ accent }: { accent: string }) {
+  return (
+    <Card style={styles.childrenCard}>
+      <View style={styles.sectionHeader}><Text variant="heading">Family care</Text><Text variant="caption" color={accent}>Manage</Text></View>
+      <View style={styles.childPlaceholder}>
+        <View style={[styles.childAvatar, { backgroundColor: roleColors.parent.soft }]}><Ionicons name="person-add-outline" size={20} color={accent} /></View>
+        <View style={{ flex: 1 }}><Text variant="label">Add a child profile</Text><Text variant="caption" muted style={{ marginTop: spacing.xs }}>Track care and reminders with the right permissions.</Text></View>
+        <Ionicons name="chevron-forward" size={18} color={colors.gray400} />
+      </View>
+    </Card>
   )
 }
 
@@ -106,7 +143,7 @@ function ShopTab({ role }: { role: TabRole }) {
 
   return (
     <TabScreen>
-      <AppHeader role={role} title="Care shop" />
+      <AppHeader role={role} title="Care shop" showCart />
       <ScrollView contentContainerStyle={styles.content}>
         <Card>
           <Text variant="heading">Care essentials</Text>
@@ -115,8 +152,8 @@ function ShopTab({ role }: { role: TabRole }) {
           {error ? <Text color={colors.danger} style={{ marginTop: spacing.lg }}>{error}</Text> : null}
           {products?.length === 0 ? <EmptyState icon="bag-outline" title="No products yet" subtitle="Your care shop will appear here when products are available." /> : null}
           {products?.map((product) => {
-            const normalizedProduct = { ...product, id: Number(product.id), image_url: product.imageUrl }
-            return <ProductCard key={product.id} name={product.name} price={product.price} description={product.description} category={product.category} image={product.imageUrl} discountPercent={product.discountPercent} accent={accent} soft={roleColors[role].soft} onPress={() => setSelectedProduct(normalizedProduct)} onAdd={() => setSelectedProduct(normalizedProduct)} />
+            const normalizedProduct = { ...product, id: Number(product.id), image_url: product.imageUrl, images: product.imageUrls }
+            return <ProductCard key={product.id} name={product.name} price={product.price} description={product.description} category={product.category} image={product.imageUrl} images={product.imageUrls} discountPercent={product.discountPercent} accent={accent} soft={roleColors[role].soft} onPress={() => setSelectedProduct(normalizedProduct)} onAdd={() => setSelectedProduct(normalizedProduct)} />
           })}
         </Card>
       </ScrollView>
@@ -125,21 +162,76 @@ function ShopTab({ role }: { role: TabRole }) {
   )
 }
 
+function CartTab({ role }: { role: TabRole }) {
+  const { items, removeItem, setQuantity, totalItems, totalPrice } = useCart()
+  const accent = roleColors[role].accent
+  return (
+    <TabScreen>
+      <AppHeader role={role} title="Your cart" />
+      <ScrollView contentContainerStyle={styles.content}>
+        <Card>
+          <Text variant="heading">Ready when you are</Text>
+          <Text variant="caption" muted style={{ marginTop: spacing.xs }}>{totalItems} item{totalItems === 1 ? '' : 's'} · {totalPrice.toLocaleString()} RWF</Text>
+        </Card>
+        {items.map(({ product, quantity }) => (
+          <Card key={product.id} style={styles.cartRow}>
+            <View style={{ flex: 1 }}><Text variant="label">{product.name}</Text><Text variant="caption" muted style={{ marginTop: spacing.xs }}>{product.price.toLocaleString()} RWF each</Text></View>
+            <View style={styles.quantityRow}><TouchableOpacity onPress={() => setQuantity(product.id, quantity - 1)}><Ionicons name="remove-circle-outline" size={24} color={accent} /></TouchableOpacity><Text variant="label">{quantity}</Text><TouchableOpacity onPress={() => setQuantity(product.id, quantity + 1)}><Ionicons name="add-circle-outline" size={24} color={accent} /></TouchableOpacity></View>
+            <TouchableOpacity accessibilityLabel={`Remove ${product.name}`} onPress={() => removeItem(product.id)}><Ionicons name="trash-outline" size={19} color={colors.danger} /></TouchableOpacity>
+          </Card>
+        ))}
+        <OrderCheckoutPanel />
+      </ScrollView>
+    </TabScreen>
+  )
+}
+
+function MessagesTab({ role }: { role: TabRole }) {
+  return <TabScreen><AppHeader role={role} title="Support" /><ScrollView contentContainerStyle={styles.content}><MessagePanel accent={roleColors[role].accent} /></ScrollView></TabScreen>
+}
+
 function TrackTab({ role }: { role: TabRole }) {
   const accent = roleColors[role].accent
+  const [activeCheckin, setActiveCheckin] = useState<'Mood' | 'Energy' | 'Sleep' | null>(null)
+  const [checkins, setCheckins] = useState<Record<string, string>>({})
+  const choices = ['Low', 'Okay', 'Good']
+
+  const selectCheckin = (choice: string) => {
+    if (!activeCheckin) return
+    const next = { ...checkins, [activeCheckin]: choice }
+    setCheckins(next)
+    api.put('/health/check-ins', { date: new Date().toISOString().slice(0, 10), mood: next.Mood, energy: next.Energy, sleep: next.Sleep }).catch(() => undefined)
+    setActiveCheckin(null)
+  }
+
+  useFocusEffect(useCallback(() => {
+    let alive = true
+    api.get<{ checkIns: Array<{ date: string; mood?: string; energy?: string; sleep?: string }> }>('/health/check-ins').then((response) => {
+      const today = new Date().toISOString().slice(0, 10)
+      const entry = response.data.checkIns.find((checkIn) => checkIn.date.slice(0, 10) === today)
+      if (alive && entry) setCheckins({ Mood: entry.mood || '', Energy: entry.energy || '', Sleep: entry.sleep || '' })
+    }).catch(() => undefined)
+    return () => { alive = false }
+  }, []))
+
   return (
     <TabScreen>
       <AppHeader role={role} title="Track health" />
       <ScrollView contentContainerStyle={styles.content}>
-        {role === 'girl' ? <GirlCyclePanel accent={accent} /> : null}
+        {role === 'girl' ? <GirlCyclePanel accent={accent} /> : <RoleHealthCard role={role} accent={accent} />}
+        {role === 'parent' ? <ChildrenSummary accent={accent} /> : null}
         <Card>
-          <Text variant="heading">Daily check-in</Text>
-          <Text muted style={{ marginTop: spacing.xs }}>A few quick notes help you notice patterns over time.</Text>
+          <Text variant="heading">{role === 'parent' ? 'Family check-in' : 'Daily check-in'}</Text>
+          <Text muted style={{ marginTop: spacing.xs }}>{role === 'parent' ? 'Keep a simple note of how the family is doing today.' : 'A few quick notes help you notice patterns over time.'}</Text>
           <View style={styles.checkinRow}>
-            <CheckinItem icon="happy-outline" label="Mood" accent={accent} />
-            <CheckinItem icon="flash-outline" label="Energy" accent={accent} />
-            <CheckinItem icon="moon-outline" label="Sleep" accent={accent} />
+            <CheckinItem icon="happy-outline" label="Mood" value={checkins.Mood} accent={accent} onPress={() => setActiveCheckin('Mood')} />
+            <CheckinItem icon="flash-outline" label="Energy" value={checkins.Energy} accent={accent} onPress={() => setActiveCheckin('Energy')} />
+            <CheckinItem icon="moon-outline" label="Sleep" value={checkins.Sleep} accent={accent} onPress={() => setActiveCheckin('Sleep')} />
           </View>
+          {activeCheckin ? <View style={styles.choicePanel}>
+            <Text variant="label">How was your {activeCheckin.toLowerCase()}?</Text>
+            <View style={styles.choiceRow}>{choices.map((choice) => <TouchableOpacity key={choice} onPress={() => selectCheckin(choice)} style={[styles.choiceButton, { borderColor: accent, backgroundColor: checkins[activeCheckin] === choice ? accent : colors.surface }]}><Text variant="caption" color={checkins[activeCheckin] === choice ? colors.white : accent}>{choice}</Text></TouchableOpacity>)}</View>
+          </View> : null}
           <Text variant="caption" muted style={{ marginTop: spacing.md }}>Full check-in history will be saved to your private health profile.</Text>
         </Card>
       </ScrollView>
@@ -147,17 +239,24 @@ function TrackTab({ role }: { role: TabRole }) {
   )
 }
 
-function CheckinItem({ icon, label, accent }: { icon: keyof typeof Ionicons.glyphMap; label: string; accent: string }) {
+function CheckinItem({ icon, label, value, accent, onPress }: { icon: keyof typeof Ionicons.glyphMap; label: string; value?: string; accent: string; onPress: () => void }) {
   return (
-    <View style={styles.checkinItem}>
+    <TouchableOpacity accessibilityLabel={`Record ${label}`} onPress={onPress} style={styles.checkinItem}>
       <View style={[styles.checkinIcon, { borderColor: accent }]}><Ionicons name={icon} size={19} color={accent} /></View>
-      <Text variant="caption" muted style={{ marginTop: spacing.xs }}>{label}</Text>
-    </View>
+      <Text variant="caption" color={value ? accent : colors.gray500} style={{ marginTop: spacing.xs }}>{value || label}</Text>
+    </TouchableOpacity>
   )
 }
 
 function LearnTab({ role }: { role: TabRole }) {
   const accent = roleColors[role].accent
+  const [articles, setArticles] = useState<Array<{ id: string; title: string; summary: string; body?: string; category: string }>>([])
+  const [selectedArticle, setSelectedArticle] = useState<{ title: string; summary: string; body?: string; category: string } | null>(null)
+  useFocusEffect(useCallback(() => {
+    let alive = true
+    api.get<{ articles: Array<{ id: string; title: string; summary: string; body?: string; category: string }> }>('/education').then((response) => { if (alive) setArticles(response.data.articles) }).catch(() => undefined)
+    return () => { alive = false }
+  }, []))
   const topics = role === 'girl'
     ? [['Menstrual health', 'Understand your cycle and common changes.', 'flower-outline'], ['Comfort and pain', 'Practical ways to care for yourself during your period.', 'heart-outline'], ['When to seek help', 'Know which symptoms deserve professional attention.', 'medkit-outline']]
     : role === 'parent'
@@ -173,15 +272,18 @@ function LearnTab({ role }: { role: TabRole }) {
           <Text muted style={{ marginTop: spacing.sm, lineHeight: 21 }}>Trusted, easy-to-understand guidance for your health journey.</Text>
         </Card>
         <View style={styles.sectionHeader}><Text variant="heading">Recommended for you</Text><Text variant="caption" color={accent}>See all</Text></View>
-        {topics.map(([title, summary, icon]) => (
-          <Card key={title} style={styles.articleRow}>
+        {(articles.length > 0 ? articles.map((article) => [article.title, article.summary, 'book-outline', article] as const) : topics.map(([title, summary, icon]) => [title, summary, icon, undefined] as const)).map(([title, summary, icon, article]) => (
+          <Pressable key={title} onPress={() => setSelectedArticle(article || { title, summary, category: 'MyCare+ guidance' })} accessibilityLabel={`Open ${title}`}>
+          <Card style={styles.articleRow}>
             <View style={[styles.articleIcon, { backgroundColor: roleColors[role].soft }]}><Ionicons name={icon as keyof typeof Ionicons.glyphMap} size={21} color={accent} /></View>
             <View style={{ flex: 1 }}><Text variant="label">{title}</Text><Text variant="caption" muted style={{ marginTop: spacing.xs, lineHeight: 18 }}>{summary}</Text></View>
             <Ionicons name="chevron-forward" size={18} color={colors.gray400} />
           </Card>
+          </Pressable>
         ))}
         <Text variant="caption" muted center>Education content is reviewed and published by the MyCare+ care team.</Text>
       </ScrollView>
+      <Modal visible={Boolean(selectedArticle)} transparent animationType="slide" onRequestClose={() => setSelectedArticle(null)}><Pressable style={styles.modalOverlay} onPress={() => setSelectedArticle(null)}><Pressable style={styles.articleSheet} onPress={(event) => event.stopPropagation()}><Text variant="caption" color={accent}>{selectedArticle?.category}</Text><Text variant="title" style={{ marginTop: spacing.xs }}>{selectedArticle?.title}</Text><Text muted style={{ marginTop: spacing.lg, lineHeight: 23 }}>{selectedArticle?.body || selectedArticle?.summary}</Text><Button title="Close" variant="secondary" onPress={() => setSelectedArticle(null)} style={{ marginTop: spacing.xl }} /></Pressable></Pressable></Modal>
     </TabScreen>
   )
 }
@@ -217,6 +319,7 @@ function OrdersTab({ role }: { role: TabRole }) {
     <TabScreen>
       <AppHeader role={role} title="Your orders" />
       <ScrollView contentContainerStyle={styles.content}>
+        <OrderCheckoutPanel />
         {orders === null && !error ? (
           <Card><ActivityIndicator color={roleColors[role].accent} /></Card>
         ) : error ? (
@@ -231,7 +334,6 @@ function OrdersTab({ role }: { role: TabRole }) {
           </Card>
         ) : (
           <>
-            <OrderCheckoutPanel />
             {orders!.map((order) => (
               <OrderCard key={order.id} productName={order.product.name} quantity={order.quantity} total={order.totalPrice} status={order.status} date={order.createdAt} />
             ))}
@@ -306,10 +408,16 @@ export default function RoleTabs({ role }: { role: TabRole }) {
       <Tab.Screen name="Shop" options={{ tabBarLabel: 'Shop' }}>
         {() => <ShopTab role={role} />}
       </Tab.Screen>
+      <Tab.Screen name="Cart" options={{ tabBarButton: () => null }}>
+        {() => <CartTab role={role} />}
+      </Tab.Screen>
+      <Tab.Screen name="Messages" options={{ tabBarButton: () => null }}>
+        {() => <MessagesTab role={role} />}
+      </Tab.Screen>
       <Tab.Screen name="Orders" options={{ tabBarLabel: 'Orders' }}>
         {() => <OrdersTab role={role} />}
       </Tab.Screen>
-      <Tab.Screen name="Profile" options={{ tabBarLabel: 'Profile' }}>
+      <Tab.Screen name="Profile" options={{ tabBarButton: () => null }}>
         {() => <ProfileTab role={role} />}
       </Tab.Screen>
     </Tab.Navigator>
@@ -331,9 +439,21 @@ const styles = StyleSheet.create({
   checkinRow: { flexDirection: 'row', justifyContent: 'space-between', marginTop: spacing.xl },
   checkinItem: { alignItems: 'center', flex: 1 },
   checkinIcon: { width: 46, height: 46, borderRadius: 23, borderWidth: 1.5, alignItems: 'center', justifyContent: 'center' },
+  healthActionRow: { flexDirection: 'row', gap: spacing.sm, marginTop: spacing.lg },
+  healthStat: { flex: 1, backgroundColor: colors.gray100, borderRadius: radius.md, padding: spacing.md },
+  childrenCard: { paddingBottom: spacing.sm },
+  childPlaceholder: { flexDirection: 'row', alignItems: 'center', gap: spacing.md, marginTop: spacing.lg, paddingVertical: spacing.sm },
+  childAvatar: { width: 44, height: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center' },
+  choicePanel: { marginTop: spacing.lg, padding: spacing.md, borderRadius: radius.md, backgroundColor: colors.gray100 },
+  choiceRow: { flexDirection: 'row', gap: spacing.sm, marginTop: spacing.sm },
+  choiceButton: { flex: 1, alignItems: 'center', borderWidth: 1, borderRadius: radius.pill, paddingVertical: spacing.sm },
   learnIntro: { minHeight: 170, justifyContent: 'flex-end' },
   articleRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.md },
   articleIcon: { width: 44, height: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center' },
+  modalOverlay: { flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(23, 33, 31, 0.45)' },
+  articleSheet: { backgroundColor: colors.surface, borderTopLeftRadius: radius.lg, borderTopRightRadius: radius.lg, padding: spacing.xl, minHeight: 320 },
+  cartRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.md },
+  quantityRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
   tabBar: { height: 70, paddingTop: spacing.sm, paddingBottom: spacing.sm, backgroundColor: colors.surface, borderTopWidth: 1, borderTopColor: colors.border },
   tabBarLabel: { fontSize: 11, fontWeight: '600' },
   tabBarItem: { paddingTop: 2 },

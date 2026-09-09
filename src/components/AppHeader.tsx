@@ -1,16 +1,23 @@
 import React from 'react'
-import { View, StyleSheet } from 'react-native'
+import { Alert, Pressable, View, StyleSheet } from 'react-native'
 import { Ionicons } from '@expo/vector-icons'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
+import { useNavigation } from '@react-navigation/native'
 import { useAuth } from '../context/AuthContext'
 import { Text } from './ui'
 import { colors, spacing, roleAccent, type Role } from '../theme'
 
-export default function AppHeader({ role, title = 'Home' }: { role: Role | string; title?: string }) {
+export default function AppHeader({ role, title = 'Home', showCart = false }: { role: Role | string; title?: string; showCart?: boolean }) {
   const insets = useSafeAreaInsets()
+  const navigation = useNavigation<any>()
   const { user } = useAuth()
   const firstName = user?.fullName?.split(' ')[0] || 'there'
   const initials = user?.fullName?.split(' ').map((part) => part[0]).join('').slice(0, 2).toUpperCase() || 'MC'
+  const navigateIfAvailable = (route: string, fallback: string) => {
+    const routeNames = navigation.getState()?.routeNames || []
+    if (routeNames.includes(route)) navigation.navigate(route)
+    else Alert.alert(fallback)
+  }
 
   return (
     <View style={[styles.header, { paddingTop: Math.max(insets.top, spacing.sm) + spacing.sm }]}>
@@ -20,13 +27,19 @@ export default function AppHeader({ role, title = 'Home' }: { role: Role | strin
         <Text variant="caption" muted>Good to see you, {firstName}</Text>
       </View>
       <View style={styles.actions}>
-        <View style={styles.iconButton} accessibilityLabel="Notifications">
+        {showCart ? <Pressable style={styles.iconButton} accessibilityLabel="Open cart" onPress={() => navigateIfAvailable('Cart', 'Your cart is available from the Shop area.')}>
+          <Ionicons name="bag-handle-outline" size={20} color={colors.ink} />
+        </Pressable> : null}
+        <Pressable style={styles.iconButton} accessibilityLabel="Open support messages" onPress={() => navigateIfAvailable('Messages', 'Support messages are not available in this account yet.')}>
+          <Ionicons name="chatbubble-ellipses-outline" size={20} color={colors.ink} />
+        </Pressable>
+        <Pressable style={styles.iconButton} accessibilityLabel="Notifications" onPress={() => Alert.alert('Notifications', 'You have no new notifications.') }>
           <Ionicons name="notifications-outline" size={20} color={colors.ink} />
           <View style={styles.notificationDot} />
-        </View>
-        <View style={[styles.avatar, { backgroundColor: roleAccent(role) }]}>
+        </Pressable>
+        <Pressable accessibilityLabel="Open profile" onPress={() => navigateIfAvailable('Profile', 'Profile details are managed from this account screen.')} style={[styles.avatar, { backgroundColor: roleAccent(role) }]}>
           <Text variant="label" color={colors.white}>{initials}</Text>
-        </View>
+        </Pressable>
       </View>
     </View>
   )

@@ -78,10 +78,7 @@ export const fontWeight = {
 
 export const shadow = {
   card: {
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.05,
-    shadowRadius: 5,
+    boxShadow: '0px 1px 5px rgba(0, 0, 0, 0.05)',
     elevation: 1,
   },
 } as const

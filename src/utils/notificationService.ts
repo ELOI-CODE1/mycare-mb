@@ -14,6 +14,7 @@ Notifications.setNotificationHandler({
 });
 
 export async function requestPermissions() {
+  if (Platform.OS === 'web') return false;
   const { status } = await Notifications.requestPermissionsAsync();
   if (status !== 'granted') {
     Alert.alert('Permission Denied', 'You will not receive period reminders.');
@@ -27,6 +28,7 @@ export async function schedulePeriodNotifications(
   isConsistentlyLate: boolean = false,
   isConsistentlyEarly: boolean = false
 ) {
+  if (Platform.OS === 'web') return;
   // Cancel all existing notifications
   await Notifications.cancelAllScheduledNotificationsAsync();
   

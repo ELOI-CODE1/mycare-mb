@@ -4,18 +4,6 @@ import { Ionicons } from '@expo/vector-icons'
 import { Text, Card } from './ui'
 import { colors, spacing, radius } from '../theme'
 
-const CATEGORY_EMOJI: Record<string, string> = {
-  pads: '🩹',
-  condoms: '🛡️',
-  pain: '💊',
-  hygiene: '🧼',
-  test: '🔬',
-}
-
-export function categoryEmoji(category?: string): string {
-  return (category && CATEGORY_EMOJI[category]) || '🛒'
-}
-
 interface Props {
   name: string
   price: number
@@ -38,8 +26,8 @@ export default function ProductCard({ name, price, description, category, image,
         {image ? (
           <Image source={{ uri: image }} style={styles.thumb} />
         ) : (
-          <View style={[styles.thumb, styles.thumbFallback, { backgroundColor: soft }]}> 
-            <Text style={styles.emoji}>{categoryEmoji(category)}</Text>
+          <View style={[styles.thumb, styles.thumbFallback, { backgroundColor: soft }]}>
+            <Text variant="caption" muted center>Image unavailable</Text>
           </View>
         )}
 
@@ -79,7 +67,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  emoji: { fontSize: 26 },
   info: { flex: 1 },
   addBtn: {
     width: 40,

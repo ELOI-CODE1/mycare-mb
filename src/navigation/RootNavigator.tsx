@@ -15,9 +15,6 @@ export type RootStackParamList = {
   SignUp: undefined
   ResetPassword: undefined
   RoleGateway: undefined
-  GirlDashboard: undefined
-  BoyDashboard: undefined
-  ParentDashboard: undefined
   AdminDashboard: undefined
 }
 
