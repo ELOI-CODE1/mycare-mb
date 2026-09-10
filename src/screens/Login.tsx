@@ -1,7 +1,8 @@
 import React, { useState } from 'react'
 import { View, Alert, TouchableOpacity } from 'react-native'
 import type { NativeStackScreenProps } from '@react-navigation/native-stack'
-import { Screen, Text, Input, Button } from '../components/ui'
+import { Screen, Text, Input, Button, PasswordField } from '../components/ui'
+import BrandLogo from '../components/BrandLogo'
 import { colors, spacing } from '../theme'
 import { useAuth } from '../context/AuthContext'
 import type { RootStackParamList } from '../navigation/RootNavigator'
@@ -34,9 +35,9 @@ export default function Login({ navigation }: Props) {
   return (
     <Screen background={colors.surface}>
       <View style={{ flex: 1, justifyContent: 'center', minHeight: 480 }}>
-        <Text variant="display" color={colors.primary} center>
-          MyCare+
-        </Text>
+        <View style={{ alignItems: 'center', marginBottom: spacing.lg }}>
+          <BrandLogo size={72} showName />
+        </View>
         <Text muted center style={{ marginBottom: spacing.xxl }}>
           Login to your account
         </Text>
@@ -49,12 +50,11 @@ export default function Login({ navigation }: Props) {
           autoCapitalize="none"
           keyboardType="email-address"
         />
-        <Input
+        <PasswordField
           label="Password"
           placeholder="••••••••"
           value={password}
           onChangeText={setPassword}
-          secureTextEntry
         />
 
         <TouchableOpacity

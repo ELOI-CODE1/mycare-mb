@@ -53,10 +53,9 @@ export default function AddToCartModal({ visible, onClose, product, accent = col
   }
 
   return (
-    <Modal visible={visible} animationType="slide" transparent onRequestClose={onClose}>
-      <Pressable style={styles.overlay} onPress={onClose}>
-        <Pressable style={styles.sheet} onPress={(e) => e.stopPropagation()}>
-          <View style={styles.handle} />
+    <Modal visible={visible} animationType="slide" onRequestClose={onClose}>
+        <View style={styles.sheet}>
+          <View style={styles.pageHeader}><TouchableOpacity accessibilityLabel="Close product details" onPress={onClose}><Ionicons name="arrow-back" size={23} color={colors.ink} /></TouchableOpacity><Text variant="label">Product details</Text><View style={{ width: 23 }} /></View>
 
           <Text variant="caption" muted>
             Add to cart
@@ -141,8 +140,7 @@ export default function AddToCartModal({ visible, onClose, product, accent = col
           <TouchableOpacity style={styles.closeBtn} onPress={onClose}>
             <Text muted>Cancel</Text>
           </TouchableOpacity>
-        </Pressable>
-      </Pressable>
+        </View>
       <Modal visible={fullImageVisible} animationType="fade" presentationStyle="fullScreen" onRequestClose={() => setFullImageVisible(false)}>
         <View style={styles.fullscreenViewer}>
           <Pressable accessibilityLabel="Close full screen image" onPress={() => setFullImageVisible(false)} style={styles.fullscreenClose}><Ionicons name="close" size={26} color={colors.white} /></Pressable>
@@ -154,22 +152,13 @@ export default function AddToCartModal({ visible, onClose, product, accent = col
 }
 
 const styles = StyleSheet.create({
-  overlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.45)', justifyContent: 'flex-end' },
   sheet: {
+    flex: 1,
     backgroundColor: colors.surface,
-    borderTopLeftRadius: radius.lg,
-    borderTopRightRadius: radius.lg,
     padding: spacing.xl,
-    paddingBottom: spacing.xxl,
+    paddingTop: spacing.lg,
   },
-  handle: {
-    width: 40,
-    height: 4,
-    borderRadius: 2,
-    backgroundColor: colors.gray200,
-    alignSelf: 'center',
-    marginBottom: spacing.lg,
-  },
+  pageHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: spacing.lg },
   galleryCard: {
     marginBottom: spacing.md,
     borderRadius: radius.lg,

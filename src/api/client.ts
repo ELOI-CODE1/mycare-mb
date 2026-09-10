@@ -41,9 +41,17 @@ api.interceptors.response.use(
 
 export function apiErrorMessage(error: unknown, fallback = 'Something went wrong. Please try again.') {
   if (axios.isAxiosError(error)) {
-    if (!error.response) return `Network error while contacting ${API_URL}: ${error.message}${error.code ? ` [${error.code}]` : ''}. Check that the backend is running and the API URL is correct.`
+    if (!error.response) return 'Can\u2019t reach the server. Check your internet connection and try again.'
     const serverError = error.response.data?.error
-    return serverError ? `${serverError} (HTTP ${error.response.status})` : `Request failed (HTTP ${error.response.status})`
+    if (typeof serverError === 'string' && serverError.trim()) return serverError
+    switch (error.response.status) {
+      case 400: return 'Something wasn\u2019t right. Please check your entries and try again.'
+      case 401: return 'Your session has expired. Please log in again.'
+      case 403: return 'You don\u2019t have permission to do that.'
+      case 404: return 'We couldn\u2019t find what you asked for.'
+      case 410: return 'That feature is no longer available.'
+      default: return 'Something went wrong on our side. Please try again later.'
+    }
   }
   if (error instanceof Error && error.message) return error.message
   return fallback

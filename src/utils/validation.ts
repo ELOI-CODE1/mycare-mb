@@ -3,7 +3,6 @@ export interface SignupFormData {
     email: string 
     password: string
     phone: string
-    location: string
 }
 
 export interface AnswersData {
@@ -16,7 +15,6 @@ export interface FormErrors {
     email?: string
     password?: string 
     phone?: string
-    location?: string
     q1?: string
     q2?: string
 }
@@ -24,8 +22,11 @@ export interface FormErrors {
 //email regex
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
-//phone regex
-const PHONE_REGEX = /^(?:\+250|250|0)?7[2389]\d{7}$/;
+// Accept any reachable number: optional +, digits, spaces, dashes (7–15 digits).
+export const isReachablePhone = (phone: string): boolean => {
+    const digits = phone.trim().replace(/\D/g, '')
+    return digits.length >= 7 && digits.length <= 15
+}
 
 export const validateStepOne = (data: SignupFormData): { isValid: boolean; errors: FormErrors}  => {
     const errors: FormErrors = {}
@@ -54,12 +55,8 @@ export const validateStepOne = (data: SignupFormData): { isValid: boolean; error
     //Phone number
     if (!data.phone.trim()) {
         errors.phone = 'Phone number is required.'
-    } else if (!PHONE_REGEX.test(data.phone.trim().replace(/\s+/g, ''))) {
+    } else if (!isReachablePhone(data.phone)) {
         errors.phone = 'Enter a valid phone number.'
-    }
-
-    if (!data.location.trim()) {
-        errors.location = 'Your staying location is required.'
     }
 
     return{

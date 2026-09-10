@@ -1,20 +1,25 @@
 import React, { useCallback, useState } from 'react'
-import { ActivityIndicator, Modal, Pressable, ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native'
+import { ActivityIndicator, Alert, Modal, Pressable, ScrollView, StyleSheet, Switch, TextInput, TouchableOpacity, View } from 'react-native'
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs'
-import { useFocusEffect } from '@react-navigation/native'
+import { useFocusEffect, useNavigation } from '@react-navigation/native'
 import { Ionicons } from '@expo/vector-icons'
 import AppHeader from '../components/AppHeader'
-import { Button, Card, EmptyState, Text } from '../components/ui'
+import { Button, Card, EmptyState, Input, Text } from '../components/ui'
 import ProductCard from '../components/ProductCard'
 import AddToCartModal from '../components/AddToCartModal'
 import GirlCyclePanel from '../components/GirlCyclePanel'
+import ChildTrackPanel from '../components/ChildTrackPanel'
+import ParentReportPanel from '../components/ParentReportPanel'
+import { ChildProvider, useChild } from '../context/ChildContext'
+import HealthProfilePanel from '../components/HealthProfilePanel'
+import ChildrenManager from '../components/ChildrenManager'
 import OrderCheckoutPanel from '../components/OrderCheckoutPanel'
 import OrderCard from '../components/OrderCard'
 import MessagePanel from '../components/MessagePanel'
 import { useAuth } from '../context/AuthContext'
 import { useCart } from '../context/CartContext'
 import { api, apiErrorMessage } from '../api/client'
-import type { ApiProduct } from '../api/types'
+import type { ApiOrder, ApiProduct } from '../api/types'
 import { colors, radius, roleColors, spacing } from '../theme'
 
 export type TabRole = 'girl' | 'boy' | 'parent'
@@ -27,6 +32,7 @@ const TAB_META: Record<string, { label: string; icon: keyof typeof Ionicons.glyp
   Learn: { label: 'Learn', icon: 'book', outline: 'book-outline' },
   Shop: { label: 'Shop', icon: 'bag', outline: 'bag-outline' },
   Orders: { label: 'Orders', icon: 'receipt', outline: 'receipt-outline' },
+  Family: { label: 'Family', icon: 'people', outline: 'people-outline' },
   Profile: { label: 'Profile', icon: 'person', outline: 'person-outline' },
   Cart: { label: 'Cart', icon: 'bag-handle', outline: 'bag-handle-outline' },
   Messages: { label: 'Messages', icon: 'chatbubble-ellipses', outline: 'chatbubble-ellipses-outline' },
@@ -36,9 +42,15 @@ function TabScreen({ children }: { children: React.ReactNode }) {
   return <View style={styles.screen}>{children}</View>
 }
 
+function useTabNav() {
+  return useNavigation<{ navigate: (screen: string) => void }>()
+}
+
 function HomeTab({ role, title, description }: { role: TabRole; title: string; description: string }) {
   const accent = roleColors[role].accent
+  const nav = useTabNav()
   const isGirl = role === 'girl'
+  const detailsTarget = role === 'boy' ? 'Learn' : 'Track'
   return (
     <TabScreen>
       <AppHeader role={role} title="Your health" />
@@ -53,41 +65,54 @@ function HomeTab({ role, title, description }: { role: TabRole; title: string; d
             <Ionicons name={isGirl ? 'flower-outline' : role === 'parent' ? 'people-outline' : 'shield-checkmark-outline'} size={28} color={colors.white} />
           </View>
         </Card>
-        {role === 'girl' ? <GirlCyclePanel accent={accent} /> : <RoleHealthCard role={role} accent={accent} />}
-        {role === 'parent' ? <ChildrenSummary accent={accent} /> : null}
-        <View style={styles.sectionHeader}>
-          <Text variant="heading">Your snapshot</Text>
-          <Text variant="caption" color={accent}>View details</Text>
-        </View>
-        <View style={styles.metricGrid}>
-          <MetricTile icon="heart-outline" label="Wellness check-in" value="Not logged" tint={accent} soft={roleColors[role].soft} />
-          <MetricTile icon="calendar-outline" label={isGirl ? 'Next period' : 'Next reminder'} value={isGirl ? 'Log 2+ cycles' : 'Set a reminder'} tint={accent} soft={roleColors[role].soft} />
-        </View>
-        <Card style={styles.insightCard}>
-          <View style={[styles.insightIcon, { backgroundColor: roleColors[role].soft }]}>
-            <Ionicons name="sparkles-outline" size={20} color={accent} />
-          </View>
-          <View style={{ flex: 1 }}>
-            <Text variant="label">Build your health picture</Text>
-            <Text variant="caption" muted style={{ marginTop: spacing.xs }}>A quick check-in helps MyCare+ make more useful suggestions over time.</Text>
-          </View>
-          <Ionicons name="chevron-forward" size={18} color={colors.gray400} />
-        </Card>
+        {role === 'parent' ? (
+          <ParentReportPanel accent={accent} />
+        ) : (
+          <>
+            {role === 'girl' ? <GirlCyclePanel accent={accent} mode="present" /> : <RoleHealthCard accent={accent} />}
+            <View style={styles.sectionHeader}>
+              <Text variant="heading">Your snapshot</Text>
+              <TouchableOpacity accessibilityLabel="View health details" onPress={() => nav.navigate(detailsTarget)}>
+                <Text variant="caption" color={accent}>View details</Text>
+              </TouchableOpacity>
+            </View>
+            <View style={styles.metricGrid}>
+              <MetricTile icon="heart-outline" label="Wellness check-in" value="Log today" tint={accent} soft={roleColors[role].soft} onPress={() => nav.navigate(detailsTarget)} />
+              <MetricTile icon="calendar-outline" label={isGirl ? 'Next period' : 'Next reminder'} value={isGirl ? 'Track cycle' : 'Learn more'} tint={accent} soft={roleColors[role].soft} onPress={() => nav.navigate(detailsTarget)} />
+            </View>
+            <TouchableOpacity accessibilityLabel="Open daily check-in" onPress={() => nav.navigate(detailsTarget)}>
+              <Card style={styles.insightCard}>
+                <View style={[styles.insightIcon, { backgroundColor: roleColors[role].soft }]}>
+                  <Ionicons name="sparkles-outline" size={20} color={accent} />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text variant="label">Build your health picture</Text>
+                  <Text variant="caption" muted style={{ marginTop: spacing.xs }}>A quick check-in helps MyCare+ make more useful suggestions over time.</Text>
+                </View>
+                <Ionicons name="chevron-forward" size={18} color={colors.gray400} />
+              </Card>
+            </TouchableOpacity>
+          </>
+        )}
       </ScrollView>
     </TabScreen>
   )
 }
 
-function RoleHealthCard({ role, accent }: { role: Exclude<TabRole, 'girl'>; accent: string }) {
-  const isParent = role === 'parent'
+function RoleHealthCard({ accent }: { accent: string }) {
+  const nav = useTabNav()
   return (
     <Card>
-      <Text variant="caption" color={accent}>{isParent ? 'FAMILY WELLNESS' : 'YOUR WELLNESS'}</Text>
-      <Text variant="heading" style={{ marginTop: spacing.xs }}>{isParent ? 'Stay close to the care that matters.' : 'Small steps, stronger health.'}</Text>
-      <Text muted style={{ marginTop: spacing.sm, lineHeight: 21 }}>{isParent ? 'Keep your family care details, reminders, and supplies in one calm place.' : 'Build a private health picture with check-ins, education, and timely reminders.'}</Text>
+      <Text variant="caption" color={accent}>YOUR WELLNESS</Text>
+      <Text variant="heading" style={{ marginTop: spacing.xs }}>Small steps, stronger health.</Text>
+      <Text muted style={{ marginTop: spacing.sm, lineHeight: 21 }}>Build a private health picture with check-ins, education, and timely reminders.</Text>
       <View style={styles.healthActionRow}>
-        <HealthStat label={isParent ? 'Children' : 'Check-ins'} value={isParent ? 'Add a profile' : 'Start today'} accent={accent} />
-        <HealthStat label={isParent ? 'Reminders' : 'Education'} value={isParent ? 'None set' : 'Explore topics'} accent={accent} />
+        <TouchableOpacity style={{ flex: 1 }} accessibilityLabel="Explore education" onPress={() => nav.navigate('Learn')}>
+          <HealthStat label="Education" value="Explore topics" accent={accent} />
+        </TouchableOpacity>
+        <TouchableOpacity style={{ flex: 1 }} accessibilityLabel="Open care shop" onPress={() => nav.navigate('Shop')}>
+          <HealthStat label="Care shop" value="See products" accent={accent} />
+        </TouchableOpacity>
       </View>
     </Card>
   )
@@ -98,28 +123,42 @@ function HealthStat({ label, value, accent }: { label: string; value: string; ac
 }
 
 function ChildrenSummary({ accent }: { accent: string }) {
+  const nav = useTabNav()
   return (
     <Card style={styles.childrenCard}>
-      <View style={styles.sectionHeader}><Text variant="heading">Family care</Text><Text variant="caption" color={accent}>Manage</Text></View>
-      <View style={styles.childPlaceholder}>
-        <View style={[styles.childAvatar, { backgroundColor: roleColors.parent.soft }]}><Ionicons name="person-add-outline" size={20} color={accent} /></View>
-        <View style={{ flex: 1 }}><Text variant="label">Add a child profile</Text><Text variant="caption" muted style={{ marginTop: spacing.xs }}>Track care and reminders with the right permissions.</Text></View>
-        <Ionicons name="chevron-forward" size={18} color={colors.gray400} />
+      <View style={styles.sectionHeader}>
+        <Text variant="heading">Family care</Text>
+        <TouchableOpacity accessibilityLabel="Manage child profiles" onPress={() => nav.navigate('Family')}>
+          <Text variant="caption" color={accent}>Manage</Text>
+        </TouchableOpacity>
       </View>
+      <TouchableOpacity accessibilityLabel="Add a child profile" onPress={() => nav.navigate('Family')}>
+        <View style={styles.childPlaceholder}>
+          <View style={[styles.childAvatar, { backgroundColor: roleColors.parent.soft }]}><Ionicons name="person-add-outline" size={20} color={accent} /></View>
+          <View style={{ flex: 1 }}><Text variant="label">Add a child profile</Text><Text variant="caption" muted style={{ marginTop: spacing.xs }}>Track care and reminders with the right permissions.</Text></View>
+          <Ionicons name="chevron-forward" size={18} color={colors.gray400} />
+        </View>
+      </TouchableOpacity>
     </Card>
   )
 }
 
-function MetricTile({ icon, label, value, tint, soft }: { icon: keyof typeof Ionicons.glyphMap; label: string; value: string; tint: string; soft: string }) {
+function MetricTile({ icon, label, value, tint, soft, onPress }: { icon: keyof typeof Ionicons.glyphMap; label: string; value: string; tint: string; soft: string; onPress?: () => void }) {
   return (
-    <Card style={styles.metricTile}>
-      <View style={[styles.metricIcon, { backgroundColor: soft }]}>
-        <Ionicons name={icon} size={18} color={tint} />
-      </View>
-      <Text variant="caption" muted style={{ marginTop: spacing.sm }}>{label}</Text>
-      <Text variant="label" style={{ marginTop: spacing.xs }}>{value}</Text>
-    </Card>
+    <TouchableOpacity style={{ flex: 1 }} accessibilityLabel={label} onPress={onPress} disabled={!onPress}>
+      <Card style={styles.metricTile}>
+        <View style={[styles.metricIcon, { backgroundColor: soft }]}>
+          <Ionicons name={icon} size={18} color={tint} />
+        </View>
+        <Text variant="caption" muted style={{ marginTop: spacing.sm }}>{label}</Text>
+        <Text variant="label" style={{ marginTop: spacing.xs }}>{value}</Text>
+      </Card>
+    </TouchableOpacity>
   )
+}
+
+function productImage(product: ApiProduct): string | undefined {
+  return product.displayImage ?? product.imageData ?? product.imageUrl ?? product.imageUrls?.[0]
 }
 
 function ShopTab({ role }: { role: TabRole }) {
@@ -149,11 +188,17 @@ function ShopTab({ role }: { role: TabRole }) {
           <Text variant="heading">Care essentials</Text>
           <Text muted style={{ marginTop: spacing.xs }}>Thoughtful products selected for your wellness needs.</Text>
           {products === null && !error ? <ActivityIndicator color={accent} style={{ marginVertical: spacing.xl }} /> : null}
-          {error ? <Text color={colors.danger} style={{ marginTop: spacing.lg }}>{error}</Text> : null}
+          {error ? (
+            <View>
+              <Text color={colors.danger} style={{ marginTop: spacing.lg }}>{error}</Text>
+              <TouchableOpacity onPress={() => setProducts(null)}><Text color={accent}>Try again</Text></TouchableOpacity>
+            </View>
+          ) : null}
           {products?.length === 0 ? <EmptyState icon="bag-outline" title="No products yet" subtitle="Your care shop will appear here when products are available." /> : null}
           <View style={styles.productGrid}>{products?.map((product) => {
-            const normalizedProduct = { ...product, id: Number(product.id), image_url: product.imageUrl, images: product.imageUrls }
-            return <ProductCard key={product.id} name={product.name} price={product.price} description={product.description} category={product.category} image={product.imageUrl} images={product.imageUrls} discountPercent={product.discountPercent} accent={accent} soft={roleColors[role].soft} onPress={() => setSelectedProduct(normalizedProduct)} onAdd={() => setSelectedProduct(normalizedProduct)} />
+            const normalizedProduct = { ...product, id: Number(product.id), image_url: productImage(product), images: product.imageUrls }
+            const image = productImage(product)
+            return <ProductCard key={product.id} name={product.name} price={product.price} description={product.description} category={product.category} image={image} images={product.imageUrls} discountPercent={product.discountPercent} accent={accent} soft={roleColors[role].soft} onPress={() => setSelectedProduct(normalizedProduct)} onAdd={() => setSelectedProduct(normalizedProduct)} />
           })}</View>
         </Card>
       </ScrollView>
@@ -200,7 +245,8 @@ function TrackTab({ role }: { role: TabRole }) {
     if (!activeCheckin) return
     const next = { ...checkins, [activeCheckin]: choice }
     setCheckins(next)
-    api.put('/health/check-ins', { date: new Date().toISOString().slice(0, 10), mood: next.Mood, energy: next.Energy, sleep: next.Sleep }).catch(() => undefined)
+    const timeZone = (() => { try { return Intl.DateTimeFormat().resolvedOptions().timeZone } catch { return undefined } })()
+    api.put('/health/check-ins', { date: new Date().toISOString().slice(0, 10), timeZone, mood: next.Mood, energy: next.Energy, sleep: next.Sleep }).catch(() => undefined)
     setActiveCheckin(null)
   }
 
@@ -218,11 +264,14 @@ function TrackTab({ role }: { role: TabRole }) {
     <TabScreen>
       <AppHeader role={role} title="Track health" />
       <ScrollView contentContainerStyle={styles.content}>
-        {role === 'girl' ? <GirlCyclePanel accent={accent} /> : <RoleHealthCard role={role} accent={accent} />}
-        {role === 'parent' ? <ChildrenSummary accent={accent} /> : null}
-        <Card>
-          <Text variant="heading">{role === 'parent' ? 'Family check-in' : 'Daily check-in'}</Text>
-          <Text muted style={{ marginTop: spacing.xs }}>{role === 'parent' ? 'Keep a simple note of how the family is doing today.' : 'A few quick notes help you notice patterns over time.'}</Text>
+        {role === 'parent' ? (
+          <ParentTrackSection accent={accent} />
+        ) : (
+          <>
+            <GirlCyclePanel accent={accent} />
+            <Card>
+          <Text variant="heading">Daily check-in</Text>
+          <Text muted style={{ marginTop: spacing.xs }}>A few quick notes help you notice patterns over time.</Text>
           <View style={styles.checkinRow}>
             <CheckinItem icon="happy-outline" label="Mood" value={checkins.Mood} accent={accent} onPress={() => setActiveCheckin('Mood')} />
             <CheckinItem icon="flash-outline" label="Energy" value={checkins.Energy} accent={accent} onPress={() => setActiveCheckin('Energy')} />
@@ -232,10 +281,42 @@ function TrackTab({ role }: { role: TabRole }) {
             <Text variant="label">How was your {activeCheckin.toLowerCase()}?</Text>
             <View style={styles.choiceRow}>{choices.map((choice) => <TouchableOpacity key={choice} onPress={() => selectCheckin(choice)} style={[styles.choiceButton, { borderColor: accent, backgroundColor: checkins[activeCheckin] === choice ? accent : colors.surface }]}><Text variant="caption" color={checkins[activeCheckin] === choice ? colors.white : accent}>{choice}</Text></TouchableOpacity>)}</View>
           </View> : null}
-          <Text variant="caption" muted style={{ marginTop: spacing.md }}>Full check-in history will be saved to your private health profile.</Text>
+          <Text variant="caption" muted style={{ marginTop: spacing.md }}>Saved to your private health profile with timezone-safe dates.</Text>
         </Card>
+        <HealthProfilePanel accent={accent} />
+          </>
+        )}
       </ScrollView>
     </TabScreen>
+  )
+}
+
+function ParentTrackSection({ accent }: { accent: string }) {
+  const nav = useTabNav()
+  const { selected, children, refresh } = useChild()
+  useFocusEffect(useCallback(() => { refresh() }, [refresh]))
+  if (!selected) {
+    return (
+      <Card>
+        <Text variant="heading">No child selected</Text>
+        <Text muted style={{ marginTop: spacing.sm }}>Choose a child account in Family to see her track data here.</Text>
+        <Button title="Go to Family" onPress={() => nav.navigate('Family')} accent={accent} style={{ marginTop: spacing.md }} />
+      </Card>
+    )
+  }
+  return (
+    <View style={{ gap: spacing.lg }}>
+      <Card>
+        <Text variant="caption" color={accent}>NOW TRACKING</Text>
+        <Text variant="title" style={{ marginTop: spacing.xs }}>{selected.fullName}</Text>
+        {children.length > 1 ? (
+          <TouchableOpacity accessibilityLabel="Switch child account" onPress={() => nav.navigate('Family')} style={{ marginTop: spacing.sm }}>
+            <Text variant="caption" color={accent}>Switch child in Family →</Text>
+          </TouchableOpacity>
+        ) : null}
+      </Card>
+      <ChildTrackPanel childId={selected.id} childName={selected.fullName} accent={accent} />
+    </View>
   )
 }
 
@@ -251,10 +332,15 @@ function CheckinItem({ icon, label, value, accent, onPress }: { icon: keyof type
 function LearnTab({ role }: { role: TabRole }) {
   const accent = roleColors[role].accent
   const [articles, setArticles] = useState<Array<{ id: string; title: string; summary: string; body?: string; category: string }>>([])
+  const [query, setQuery] = useState('')
+  const [category, setCategory] = useState('All')
+  const [showAll, setShowAll] = useState(false)
+  const [learnError, setLearnError] = useState('')
   const [selectedArticle, setSelectedArticle] = useState<{ title: string; summary: string; body?: string; category: string } | null>(null)
   useFocusEffect(useCallback(() => {
     let alive = true
-    api.get<{ articles: Array<{ id: string; title: string; summary: string; body?: string; category: string }> }>('/education').then((response) => { if (alive) setArticles(response.data.articles) }).catch(() => undefined)
+    setLearnError('')
+    api.get<{ articles: Array<{ id: string; title: string; summary: string; body?: string; category: string }> }>('/education').then((response) => { if (alive) setArticles(response.data.articles) }).catch((e) => { if (alive) setLearnError(apiErrorMessage(e, 'Could not load education content.')) })
     return () => { alive = false }
   }, []))
   const topics = role === 'girl'
@@ -262,6 +348,15 @@ function LearnTab({ role }: { role: TabRole }) {
     : role === 'parent'
     ? [['Supporting growing children', 'Helpful, age-appropriate guidance for family care.', 'people-outline'], ['Healthy conversations', 'Build trust around changing bodies and wellbeing.', 'chatbubble-ellipses-outline'], ['When to seek help', 'Know when a health concern needs professional care.', 'medkit-outline']]
     : [['Protection and testing', 'Make informed choices about sexual health.', 'shield-checkmark-outline'], ['Healthy conversations', 'Build confidence talking about wellbeing and boundaries.', 'chatbubble-ellipses-outline'], ['When to seek help', 'Know when a health concern needs professional care.', 'medkit-outline']]
+  const rows = (articles.length > 0 ? articles.map((article) => [article.title, article.summary, 'book-outline', article] as const) : topics.map(([title, summary, icon]) => [title, summary, icon, undefined] as const))
+    .filter(([title, summary, , article]) => {
+      const q = query.trim().toLowerCase()
+      const inQuery = !q || `${title} ${summary}`.toLowerCase().includes(q)
+      const inCategory = category === 'All' || (article ? article.category === category : true)
+      return inQuery && inCategory
+    })
+  const categories = ['All', ...Array.from(new Set(articles.map((a) => a.category))).slice(0, 8)]
+  const visible = showAll ? rows : rows.slice(0, 5)
   return (
     <TabScreen>
       <AppHeader role={role} title="Learn" />
@@ -271,8 +366,30 @@ function LearnTab({ role }: { role: TabRole }) {
           <Text variant="title" style={{ marginTop: spacing.xs }}>Clear answers for better care.</Text>
           <Text muted style={{ marginTop: spacing.sm, lineHeight: 21 }}>Trusted, easy-to-understand guidance for your health journey.</Text>
         </Card>
-        <View style={styles.sectionHeader}><Text variant="heading">Recommended for you</Text><Text variant="caption" color={accent}>See all</Text></View>
-        {(articles.length > 0 ? articles.map((article) => [article.title, article.summary, 'book-outline', article] as const) : topics.map(([title, summary, icon]) => [title, summary, icon, undefined] as const)).map(([title, summary, icon, article]) => (
+        <View style={styles.searchBox}>
+          <Ionicons name="search-outline" size={18} color={colors.gray500} />
+          <TextInput value={query} onChangeText={setQuery} placeholder="Search education topics" placeholderTextColor={colors.gray400} style={styles.searchInput} />
+        </View>
+        {learnError ? <Text color={colors.danger}>{learnError}</Text> : null}
+        {categories.length > 1 ? (
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chipRow}>
+            {categories.map((c) => (
+              <TouchableOpacity key={c} onPress={() => setCategory(c)} style={[styles.chip, category === c && styles.chipActive]}>
+                <Text variant="caption" color={category === c ? colors.white : colors.gray700}>{c}</Text>
+              </TouchableOpacity>
+            ))}
+          </ScrollView>
+        ) : null}
+        <View style={styles.sectionHeader}>
+          <Text variant="heading">Recommended for you</Text>
+          {rows.length > 5 ? (
+            <TouchableOpacity accessibilityLabel={showAll ? 'Show fewer topics' : 'See all topics'} onPress={() => setShowAll((v) => !v)}>
+              <Text variant="caption" color={accent}>{showAll ? 'Show less' : `See all (${rows.length})`}</Text>
+            </TouchableOpacity>
+          ) : null}
+        </View>
+        {visible.length === 0 ? <EmptyState icon="book-outline" title="No matching topics" subtitle="Try a different search." /> : null}
+        {visible.map(([title, summary, icon, article]) => (
           <Pressable key={title} onPress={() => setSelectedArticle(article || { title, summary, category: 'MyCare+ guidance' })} accessibilityLabel={`Open ${title}`}>
           <Card style={styles.articleRow}>
             <View style={[styles.articleIcon, { backgroundColor: roleColors[role].soft }]}><Ionicons name={icon as keyof typeof Ionicons.glyphMap} size={21} color={accent} /></View>
@@ -288,56 +405,76 @@ function LearnTab({ role }: { role: TabRole }) {
   )
 }
 
-type Order = {
-  id: number
-  quantity: number
-  totalPrice: number
-  status: string
-  createdAt: string
-  deliveryAddress: string | null
-  product: { name: string }
+function orderSummary(order: ApiOrder): { name: string; qty: number; total: number } {
+  const items = order.items ?? []
+  if (items.length > 0) {
+    const qty = items.reduce((n, i) => n + i.quantity, 0)
+    const total = order.total ?? order.totalPrice ?? items.reduce((n, i) => n + (i.totalPrice ?? 0), 0)
+    const name = items.length === 1 ? items[0].product?.name ?? order.product?.name ?? 'Order' : `${items[0].product?.name ?? 'Order'} +${items.length - 1} more`
+    return { name, qty, total }
+  }
+  return { name: order.product?.name ?? 'Order', qty: order.quantity ?? 1, total: order.total ?? order.totalPrice ?? 0 }
 }
 
 function OrdersTab({ role }: { role: TabRole }) {
-  const [orders, setOrders] = useState<Order[] | null>(null)
+  const nav = useTabNav()
+  const [orders, setOrders] = useState<ApiOrder[] | null>(null)
   const [error, setError] = useState('')
   const { checkoutCount } = useCart()
 
-  useFocusEffect(
-    useCallback(() => {
-      let alive = true
-      setOrders(null)
-      setError('')
-      api
-        .get<{ orders: Order[] }>('/orders')
-        .then((response) => { if (alive) setOrders(response.data.orders) })
-        .catch((err) => { if (alive) setError(apiErrorMessage(err, 'Could not load orders.')) })
-      return () => { alive = false }
-    }, [checkoutCount]),
-  )
+  const load = useCallback(async () => {
+    setOrders(null)
+    setError('')
+    try {
+      const response = await api.get<{ orders: ApiOrder[] }>('/orders')
+      setOrders(response.data.orders)
+    } catch (err) {
+      setError(apiErrorMessage(err, 'Could not load orders.'))
+    }
+  }, [])
+
+  useFocusEffect(useCallback(() => { load() }, [load, checkoutCount]))
 
   return (
     <TabScreen>
       <AppHeader role={role} title="Your orders" />
       <ScrollView contentContainerStyle={styles.content}>
-        <OrderCheckoutPanel />
         {orders === null && !error ? (
           <Card><ActivityIndicator color={roleColors[role].accent} /></Card>
         ) : error ? (
           <Card>
             <Text variant="heading">Orders</Text>
             <Text color="#B91C1C" style={{ marginTop: spacing.sm }}>{error}</Text>
+            <TouchableOpacity onPress={load} style={{ marginTop: spacing.sm }}><Text color={roleColors[role].accent}>Try again</Text></TouchableOpacity>
           </Card>
         ) : orders!.length === 0 ? (
           <Card>
             <Text variant="heading">Orders</Text>
             <EmptyState icon="receipt-outline" title="No orders yet" subtitle="Order products from the Shop tab to see them here." />
+            <Button title="Browse shop" onPress={() => nav.navigate('Shop')} accent={roleColors[role].accent} style={{ marginTop: spacing.md }} />
           </Card>
         ) : (
           <>
-            {orders!.map((order) => (
-              <OrderCard key={order.id} productName={order.product.name} quantity={order.quantity} total={order.totalPrice} status={order.status} date={order.createdAt} />
-            ))}
+            {orders!.map((order) => {
+              const summary = orderSummary(order)
+              return (
+                <OrderCard
+                  key={order.id}
+                  orderId={order.id}
+                  productName={summary.name}
+                  quantity={summary.qty}
+                  total={summary.total}
+                  status={order.status}
+                  date={order.createdAt}
+                  phone={order.phone}
+                  deliveryAddress={order.deliveryAddress}
+                  paymentMethod={order.paymentMethod}
+                  items={order.items}
+                  cancellable
+                  onChanged={load}
+                />
+              )
+            })}
           </>
         )}
       </ScrollView>
@@ -348,24 +485,70 @@ function OrdersTab({ role }: { role: TabRole }) {
 function ProfileTab({ role }: { role: TabRole }) {
   const { user, logout } = useAuth()
   const [leaving, setLeaving] = useState(false)
+  const [editing, setEditing] = useState(false)
+  const [fullName, setFullName] = useState('')
+  const [phone, setPhone] = useState('')
+  const [saving, setSaving] = useState(false)
+  const [reminders, setReminders] = useState(true)
+  const [orderUpdates, setOrderUpdates] = useState(true)
   const handleLogout = async () => {
     setLeaving(true)
     try { await logout() }
     finally { setLeaving(false) }
+  }
+  const startEdit = () => {
+    setFullName(user?.fullName ?? '')
+    setPhone(user?.phone ?? '')
+    setEditing(true)
+  }
+  const saveEdit = async () => {
+    if (fullName.trim().length < 3) {
+      Alert.alert('Check name', 'Full name needs at least 3 characters.')
+      return
+    }
+    setSaving(true)
+    try {
+      await api.patch('/auth/profile', { fullName: fullName.trim(), phone: phone.trim() || undefined })
+      Alert.alert('Saved', 'Your profile was updated. Pull to refresh on next open.')
+      setEditing(false)
+    } catch (e) {
+      Alert.alert('Could not save', apiErrorMessage(e))
+    } finally { setSaving(false) }
   }
   return (
     <TabScreen>
       <AppHeader role={role} title="Profile" />
       <ScrollView contentContainerStyle={styles.content}>
         <Card>
-          <Text variant="caption" color={roleColors[role].accent}>ACCOUNT</Text>
-          <Text variant="title" style={{ marginTop: spacing.xs }}>{user?.fullName ?? '—'}</Text>
-          <Text muted style={{ marginTop: spacing.xs }}>{user?.email ?? '—'}</Text>
-          {user?.phone ? <Text muted style={{ marginTop: spacing.xs }}>{user.phone}</Text> : null}
+          <View style={styles.sectionHeader}>
+            <Text variant="caption" color={roleColors[role].accent}>ACCOUNT</Text>
+            <TouchableOpacity accessibilityLabel="Edit profile" onPress={() => (editing ? saveEdit() : startEdit())}>
+              <Text variant="caption" color={roleColors[role].accent}>{editing ? (saving ? 'Saving…' : 'Save') : 'Edit'}</Text>
+            </TouchableOpacity>
+          </View>
+          {editing ? (
+            <View style={{ marginTop: spacing.md, gap: spacing.sm }}>
+              <Input label="Full name" value={fullName} onChangeText={setFullName} />
+              <Input label="Phone" value={phone} onChangeText={setPhone} keyboardType="phone-pad" />
+            </View>
+          ) : (
+            <>
+              <Text variant="title" style={{ marginTop: spacing.xs }}>{user?.fullName ?? '—'}</Text>
+              <Text muted style={{ marginTop: spacing.xs }}>{user?.email ?? '—'}</Text>
+              {user?.phone ? <Text muted style={{ marginTop: spacing.xs }}>{user.phone}</Text> : null}
+            </>
+          )}
           <Text variant="caption" muted style={{ marginTop: spacing.sm, textTransform: 'capitalize' }}>
             {user?.role ?? role} · member since {user?.createdAt ? new Date(user.createdAt).toLocaleDateString() : '—'}
           </Text>
         </Card>
+        <Card>
+          <Text variant="heading">Notification preferences</Text>
+          <View style={styles.prefRow}><Text style={{ flex: 1 }}>Cycle reminders</Text><Switch value={reminders} onValueChange={setReminders} /></View>
+          <View style={styles.prefRow}><Text style={{ flex: 1 }}>Order updates</Text><Switch value={orderUpdates} onValueChange={setOrderUpdates} /></View>
+          <Text variant="caption" muted>Stored on this device; reminders use your timezone-safe health dates.</Text>
+        </Card>
+        {role !== 'boy' ? <HealthProfilePanel accent={roleColors[role].accent} /> : null}
         <Button title="Log out" onPress={handleLogout} loading={leaving} accent={colors.danger} />
       </ScrollView>
     </TabScreen>
@@ -378,14 +561,48 @@ const HOME_COPY: Record<TabRole, { title: string; description: string }> = {
   parent: { title: 'Family care space', description: 'Track children, manage supplies, and stay on top of family health.' },
 }
 
+function FamilyTab({ role }: { role: TabRole }) {
+  const accent = roleColors[role].accent
+  const { children, selected, select, refresh } = useChild()
+
+  useFocusEffect(useCallback(() => { refresh() }, [refresh]))
+
+  return (
+    <TabScreen>
+      <AppHeader role={role} title="Family" />
+      <ScrollView contentContainerStyle={styles.content}>
+        <Card>
+          <Text variant="caption" color={accent}>CHILD ACCOUNTS</Text>
+          <Text variant="heading" style={{ marginTop: spacing.xs }}>Switch child</Text>
+          {children.length === 0 ? (
+            <Text variant="caption" muted style={{ marginTop: spacing.sm }}>Add a child profile below to start tracking.</Text>
+          ) : (
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chipRow}>
+              {children.map((child) => (
+                <TouchableOpacity key={child.id} accessibilityLabel={`Track ${child.fullName}`} onPress={() => select(child.id)} style={[styles.chip, selected?.id === child.id && styles.chipActive]}>
+                  <Text variant="caption" color={selected?.id === child.id ? colors.white : colors.gray700}>{child.fullName}</Text>
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+          )}
+        </Card>
+        {selected ? <ChildTrackPanel childId={selected.id} childName={selected.fullName} accent={accent} /> : null}
+        <ChildrenManager accent={accent} />
+      </ScrollView>
+    </TabScreen>
+  )
+}
+
 export default function RoleTabs({ role }: { role: TabRole }) {
   const accent = roleColors[role].accent
   return (
+    <ChildProvider>
     <Tab.Navigator
       screenOptions={({ route }) => {
         const meta = TAB_META[route.name]
         return {
           headerShown: false,
+          // Footer stays on one line: fixed height, single row, compact labels.
           tabBarStyle: styles.tabBar,
           tabBarLabelStyle: styles.tabBarLabel,
           tabBarItemStyle: styles.tabBarItem,
@@ -400,28 +617,32 @@ export default function RoleTabs({ role }: { role: TabRole }) {
       <Tab.Screen name="Home" options={{ tabBarLabel: 'Home' }}>
         {() => <HomeTab role={role} title={HOME_COPY[role].title} description={HOME_COPY[role].description} />}
       </Tab.Screen>
-      <Tab.Screen name="Track" options={{ tabBarLabel: 'Track' }}>
+      {role !== 'boy' ? <Tab.Screen name="Track" options={{ tabBarLabel: 'Track' }}>
         {() => <TrackTab role={role} />}
-      </Tab.Screen>
+      </Tab.Screen> : null}
+      {role === 'parent' ? <Tab.Screen name="Family" options={{ tabBarLabel: 'Family' }}>
+        {() => <FamilyTab role={role} />}
+      </Tab.Screen> : null}
       <Tab.Screen name="Learn" options={{ tabBarLabel: 'Learn' }}>
         {() => <LearnTab role={role} />}
       </Tab.Screen>
       <Tab.Screen name="Shop" options={{ tabBarLabel: 'Shop' }}>
         {() => <ShopTab role={role} />}
       </Tab.Screen>
-      <Tab.Screen name="Cart" options={{ tabBarButton: () => null }}>
+      <Tab.Screen name="Cart" options={{ tabBarButton: () => null, tabBarItemStyle: styles.hiddenTab }}>
         {() => <CartTab role={role} />}
       </Tab.Screen>
-      <Tab.Screen name="Messages" options={{ tabBarButton: () => null }}>
+      <Tab.Screen name="Messages" options={{ tabBarButton: () => null, tabBarItemStyle: styles.hiddenTab }}>
         {() => <MessagesTab role={role} />}
       </Tab.Screen>
       <Tab.Screen name="Orders" options={{ tabBarLabel: 'Orders' }}>
         {() => <OrdersTab role={role} />}
       </Tab.Screen>
-      <Tab.Screen name="Profile" options={{ tabBarButton: () => null }}>
+      <Tab.Screen name="Profile" options={{ tabBarButton: () => null, tabBarItemStyle: styles.hiddenTab }}>
         {() => <ProfileTab role={role} />}
       </Tab.Screen>
     </Tab.Navigator>
+    </ChildProvider>
   )
 }
 
@@ -433,7 +654,7 @@ const styles = StyleSheet.create({
   heroMark: { width: 66, height: 66, borderRadius: 33, alignItems: 'center', justifyContent: 'center', marginBottom: spacing.xs },
   sectionHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   metricGrid: { flexDirection: 'row', gap: spacing.md },
-  productGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.md, marginTop: spacing.lg },
+  productGrid: { flexDirection: 'column', gap: spacing.md, marginTop: spacing.lg },
   metricTile: { flex: 1, minHeight: 132 },
   metricIcon: { width: 36, height: 36, borderRadius: 18, alignItems: 'center', justifyContent: 'center' },
   insightCard: { flexDirection: 'row', alignItems: 'center', gap: spacing.md },
@@ -456,7 +677,16 @@ const styles = StyleSheet.create({
   articleSheet: { backgroundColor: colors.surface, borderTopLeftRadius: radius.lg, borderTopRightRadius: radius.lg, padding: spacing.xl, minHeight: 320 },
   cartRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.md },
   quantityRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
-  tabBar: { height: 70, paddingTop: spacing.sm, paddingBottom: spacing.sm, backgroundColor: colors.surface, borderTopWidth: 1, borderTopColor: colors.border },
-  tabBarLabel: { fontSize: 11, fontWeight: '600' },
-  tabBarItem: { paddingTop: 2 },
+  searchBox: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border, borderRadius: radius.md, paddingHorizontal: spacing.md },
+  searchInput: { flex: 1, minHeight: 44, color: colors.text },
+  chipRow: { flexDirection: 'row', gap: spacing.sm, paddingVertical: spacing.xs },
+  chip: { borderWidth: 1, borderColor: colors.border, borderRadius: radius.pill, paddingHorizontal: spacing.md, paddingVertical: spacing.xs, backgroundColor: colors.surface },
+  chipActive: { backgroundColor: colors.ink, borderColor: colors.ink },
+  prefRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.md, paddingVertical: spacing.sm },
+  // Single-line footer: one row, evenly spaced, compact one-line labels.
+  // Hidden tabs take no space so gaps stay even.
+  tabBar: { height: 68, flexDirection: 'row', alignItems: 'stretch', justifyContent: 'space-evenly', paddingTop: spacing.xs, paddingBottom: spacing.sm, paddingHorizontal: spacing.xs, backgroundColor: colors.surface, borderTopWidth: 1, borderTopColor: colors.border },
+  tabBarLabel: { fontSize: 11, fontWeight: '600', marginTop: 2 },
+  tabBarItem: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingTop: 2 },
+  hiddenTab: { display: 'none', flex: 0, width: 0, height: 0 },
 })

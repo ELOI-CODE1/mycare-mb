@@ -3,13 +3,15 @@ import { View, StyleSheet } from 'react-native'
 import { Text } from './Text'
 import { colors, spacing, radius } from '../../theme'
 
-// Order status -> color mapping.
+// Order status -> color mapping. Upcoming orders are warm/active;
+// completed (delivered) is green; cancelled/rejected are red/grey.
 const STATUS_STYLE: Record<string, { bg: string; fg: string }> = {
   pending: { bg: '#fff4e0', fg: '#b26a00' },
   confirmed: { bg: colors.blueSoft, fg: '#1565c0' },
   shipped: { bg: '#ede7f6', fg: '#5e35b1' },
   delivered: { bg: colors.greenSoft, fg: colors.success },
   cancelled: { bg: colors.redSoft, fg: colors.danger },
+  rejected: { bg: colors.gray100, fg: colors.gray700 },
 }
 
 interface Props {

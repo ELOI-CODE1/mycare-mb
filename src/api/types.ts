@@ -6,6 +6,8 @@ export type ApiProduct = {
   discountPercent?: number
   category?: string
   imageUrl?: string | null
+  imageData?: string | null
+  displayImage?: string | null
   imageUrls?: string[]
 }
 
@@ -24,13 +26,35 @@ export type CreateAccountPayload = {
   email: string
   password: string
   phone: string
-  location: string
-  verificationCode?: string
   role: 'girl' | 'boy' | 'parent'
 }
 
 export type CreateOrderPayload = {
   items: Array<{ productId: number; quantity: number }>
   deliveryAddress: string
-  contactPhone: string
+  phone: string
+  paymentMethod: 'call' | 'mobile_manual'
+}
+
+export type ApiOrderItem = {
+  quantity: number
+  unitPrice?: number
+  totalPrice?: number
+  product?: { id?: number; name?: string; price?: number; imageUrl?: string | null; imageData?: string | null }
+}
+
+export type ApiOrder = {
+  id: number
+  quantity?: number
+  totalPrice?: number
+  subtotal?: number
+  total?: number
+  status: string
+  createdAt: string
+  deliveryAddress?: string | null
+  phone?: string | null
+  paymentMethod?: string | null
+  items?: ApiOrderItem[] | null
+  product?: { name?: string }
+  user?: { email?: string; fullName?: string; phone?: string | null }
 }

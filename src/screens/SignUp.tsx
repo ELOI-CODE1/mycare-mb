@@ -1,7 +1,7 @@
 import React, { useState } from 'react'
 import { View, TouchableOpacity, StyleSheet, ScrollView, Alert, ActivityIndicator } from 'react-native'
 import type { NativeStackScreenProps } from '@react-navigation/native-stack'
-import { Text, Input, Button, Card, Screen } from '../components/ui'
+import { Text, Input, Button, Card, Screen, PasswordField } from '../components/ui'
 import { colors, spacing, radius } from '../theme'
 import { validateStepOne, validateStepTwo, FormErrors } from '../utils/validation'
 import type { RootStackParamList } from '../navigation/RootNavigator'
@@ -36,8 +36,8 @@ export default function SignUp({ navigation }: Props) {
   const [fullName, setFullName] = useState('')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
+  const [confirmPassword, setConfirmPassword] = useState('')
   const [phone, setPhone] = useState('')
-  const [location, setLocation] = useState('')
   const [answers, setAnswers] = useState<Record<string, string>>({})
 
   // Errors & Loading State
@@ -47,7 +47,7 @@ export default function SignUp({ navigation }: Props) {
 
   // Handle Step 1 Next
   const handleNextStep = () => {
-    const { isValid, errors: stepErrors } = validateStepOne({ fullName, email, password, phone, location })
+    const { isValid, errors: stepErrors } = validateStepOne({ fullName, email, password, phone })
     setErrors(stepErrors)
 
     if (isValid) {
@@ -65,9 +65,13 @@ export default function SignUp({ navigation }: Props) {
   // Handle Final Submit
   const handleSignUp = async () => {
     const { isValid, errors: stepErrors } = validateStepTwo(answers)
-    setErrors(stepErrors)
+    const finalErrors = { ...stepErrors }
+    if (password !== confirmPassword) {
+      finalErrors.password = 'Passwords do not match.'
+    }
+    setErrors(finalErrors)
 
-    if (!isValid) return
+    if (!isValid || password !== confirmPassword) return
 
     setSubmitError('')
     setLoading(true)
@@ -121,7 +125,7 @@ export default function SignUp({ navigation }: Props) {
           </View>
 
           <View style={styles.inputGroup}>
-            <Input
+            <PasswordField
               label="Password"
               placeholder="••••••••"
               value={password}
@@ -129,11 +133,22 @@ export default function SignUp({ navigation }: Props) {
                 setPassword(val)
                 if (errors.password) setErrors((prev) => ({ ...prev, password: undefined }))
               }}
-              secureTextEntry
             />
             {errors.password && <Text style={styles.errorText}>{errors.password}</Text>}
 
             {/* Forgot password moved to Login screen */}
+          </View>
+
+          <View style={styles.inputGroup}>
+            <PasswordField
+              label="Confirm password"
+              placeholder="••••••••"
+              value={confirmPassword}
+              onChangeText={(val) => {
+                setConfirmPassword(val)
+                if (errors.password) setErrors((prev) => ({ ...prev, password: undefined }))
+              }}
+            />
           </View>
 
           <View style={styles.inputGroup}>
@@ -148,20 +163,6 @@ export default function SignUp({ navigation }: Props) {
               keyboardType="phone-pad"
             />
             {errors.phone && <Text style={styles.errorText}>{errors.phone}</Text>}
-          </View>
-
-          <View style={styles.inputGroup}>
-            <Input
-              label="Staying location"
-              placeholder="City, district, or address"
-              value={location}
-              onChangeText={(val) => {
-                setLocation(val)
-                if (errors.location) setErrors((prev) => ({ ...prev, location: undefined }))
-              }}
-              multiline
-            />
-            {errors.location && <Text style={styles.errorText}>{errors.location}</Text>}
           </View>
 
           <Button title="Continue" onPress={handleNextStep} style={{ marginTop: spacing.md }} />

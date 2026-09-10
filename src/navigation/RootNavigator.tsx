@@ -13,7 +13,7 @@ import { colors } from '../theme'
 export type RootStackParamList = {
   Login: undefined
   SignUp: undefined
-  ResetPassword: undefined
+  ResetPassword: { token?: string } | undefined
   RoleGateway: undefined
   AdminDashboard: undefined
 }
