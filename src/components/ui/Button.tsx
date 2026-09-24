@@ -52,6 +52,9 @@ export function Button({
       activeOpacity={0.85}
       onPress={onPress}
       disabled={isDisabled}
+      accessibilityRole="button"
+      accessibilityState={{ disabled: isDisabled, busy: loading }}
+      accessibilityLabel={title}
       style={[
         styles.base,
         { backgroundColor: bg },
@@ -73,7 +76,8 @@ export function Button({
 
 const styles = StyleSheet.create({
   base: {
-    paddingVertical: spacing.lg,
+    minHeight: 48,
+    paddingVertical: spacing.sm,
     paddingHorizontal: spacing.xl,
     borderRadius: radius.md,
     alignItems: 'center',

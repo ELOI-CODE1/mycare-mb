@@ -79,13 +79,15 @@ export function useNotifications(role: string) {
       } else if (role === 'parent') {
         const kids = await api.get<{ children: Array<{ id: string; fullName: string }> }>('/parent/children').catch(() => null)
         if (kids) {
-          for (const kid of kids.data.children) {
-            const p = await api.get<{ periods: ChildPeriod[] }>(`/parent/children/${kid.id}/periods`).catch(() => null)
-            if (p) {
-              const reminder = periodReminder(`child-${kid.id}`, kid.fullName, p.data.periods.map((x) => x.startDate))
-              if (reminder) local.push(reminder)
-            }
-          }
+          // Parallel fan-out (was sequential N+1 await in a loop).
+          const results = await Promise.all(
+            kids.data.children.map(async (kid) => {
+              const p = await api.get<{ periods: ChildPeriod[] }>(`/parent/children/${kid.id}/periods`).catch(() => null)
+              if (!p) return null
+              return periodReminder(`child-${kid.id}`, kid.fullName, p.data.periods.map((x) => x.startDate))
+            }),
+          )
+          for (const reminder of results) if (reminder) local.push(reminder)
         }
       }
       // Local reminders first (time-sensitive), then server feed.

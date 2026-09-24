@@ -52,6 +52,12 @@ export const spacing = {
   xxl: 36,
 } as const
 
+/** Minimum touch target (Apple HIG / Material = 44pt). */
+export const touch = {
+  min: 44,
+  hitSlop: { top: 8, bottom: 8, left: 8, right: 8 },
+} as const
+
 export const radius = {
   sm: 7,
   md: 11,

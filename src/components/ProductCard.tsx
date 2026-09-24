@@ -48,7 +48,14 @@ export default function ProductCard({ name, price, description, category, image,
         </View>
       </TouchableOpacity>
 
-      <TouchableOpacity style={[styles.addBtn, { backgroundColor: accent }]} onPress={onAdd} activeOpacity={0.85}>
+      <TouchableOpacity
+        style={[styles.addBtn, { backgroundColor: accent }]}
+        onPress={onAdd}
+        activeOpacity={0.85}
+        accessibilityRole="button"
+        accessibilityLabel={`Add ${name} to cart`}
+        hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+      >
         <Ionicons name="add" size={20} color={colors.white} />
       </TouchableOpacity>
     </Card>
@@ -69,10 +76,13 @@ const styles = StyleSheet.create({
   },
   info: { flex: 1, paddingTop: spacing.sm },
   addBtn: {
-    width: 36,
-    height: 36,
+    minWidth: 44,
+    minHeight: 44,
+    width: 44,
+    height: 44,
     borderRadius: radius.pill,
     alignItems: 'center',
     justifyContent: 'center',
+    alignSelf: 'flex-end',
   },
 })

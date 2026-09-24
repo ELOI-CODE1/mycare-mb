@@ -1,10 +1,11 @@
 import React, { useCallback, useState } from 'react'
-import { ActivityIndicator, Alert, Modal, Pressable, ScrollView, StyleSheet, Switch, TextInput, TouchableOpacity, View } from 'react-native'
+import { ActivityIndicator, Alert, Modal, Pressable, ScrollView, Share, StyleSheet, Switch, TextInput, TouchableOpacity, View } from 'react-native'
+import AsyncStorage from '@react-native-async-storage/async-storage'
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs'
-import { useFocusEffect, useNavigation } from '@react-navigation/native'
+import { useFocusEffect, useNavigation, useRoute } from '@react-navigation/native'
 import { Ionicons } from '@expo/vector-icons'
 import AppHeader from '../components/AppHeader'
-import { Button, Card, EmptyState, Input, Text } from '../components/ui'
+import { Button, Card, EmptyState, Input, PasswordField, Segmented, Text } from '../components/ui'
 import ProductCard from '../components/ProductCard'
 import AddToCartModal from '../components/AddToCartModal'
 import GirlCyclePanel from '../components/GirlCyclePanel'
@@ -15,6 +16,8 @@ import HealthProfilePanel from '../components/HealthProfilePanel'
 import ChildrenManager from '../components/ChildrenManager'
 import OrderCheckoutPanel from '../components/OrderCheckoutPanel'
 import OrderCard from '../components/OrderCard'
+import WellnessCheckinCard from '../components/WellnessCheckinCard'
+import { getNotifPrefs, setNotifPrefs } from '../utils/notificationService'
 import MessagePanel from '../components/MessagePanel'
 import { useAuth } from '../context/AuthContext'
 import { useCart } from '../context/CartContext'
@@ -43,7 +46,7 @@ function TabScreen({ children }: { children: React.ReactNode }) {
 }
 
 function useTabNav() {
-  return useNavigation<{ navigate: (screen: string) => void }>()
+  return useNavigation<{ navigate: (screen: string, params?: Record<string, unknown>) => void }>()
 }
 
 function HomeTab({ role, title, description }: { role: TabRole; title: string; description: string }) {
@@ -67,6 +70,8 @@ function HomeTab({ role, title, description }: { role: TabRole; title: string; d
         </Card>
         {role === 'parent' ? (
           <ParentReportPanel accent={accent} />
+        ) : role === 'boy' ? (
+          <BoyHome accent={accent} />
         ) : (
           <>
             {role === 'girl' ? <GirlCyclePanel accent={accent} mode="present" /> : <RoleHealthCard accent={accent} />}
@@ -78,16 +83,16 @@ function HomeTab({ role, title, description }: { role: TabRole; title: string; d
             </View>
             <View style={styles.metricGrid}>
               <MetricTile icon="heart-outline" label="Wellness check-in" value="Log today" tint={accent} soft={roleColors[role].soft} onPress={() => nav.navigate(detailsTarget)} />
-              <MetricTile icon="calendar-outline" label={isGirl ? 'Next period' : 'Next reminder'} value={isGirl ? 'Track cycle' : 'Learn more'} tint={accent} soft={roleColors[role].soft} onPress={() => nav.navigate(detailsTarget)} />
+              <MetricTile icon="calendar-outline" label={isGirl ? 'Next period' : 'Next reminder'} value={isGirl ? 'Shop essentials' : 'Learn more'} tint={accent} soft={roleColors[role].soft} onPress={() => nav.navigate(isGirl ? 'Shop' : detailsTarget)} />
             </View>
-            <TouchableOpacity accessibilityLabel="Open daily check-in" onPress={() => nav.navigate(detailsTarget)}>
+            <TouchableOpacity accessibilityLabel="Explore education" onPress={() => nav.navigate('Learn')}>
               <Card style={styles.insightCard}>
                 <View style={[styles.insightIcon, { backgroundColor: roleColors[role].soft }]}>
                   <Ionicons name="sparkles-outline" size={20} color={accent} />
                 </View>
                 <View style={{ flex: 1 }}>
-                  <Text variant="label">Build your health picture</Text>
-                  <Text variant="caption" muted style={{ marginTop: spacing.xs }}>A quick check-in helps MyCare+ make more useful suggestions over time.</Text>
+                  <Text variant="label">Understand your body</Text>
+                  <Text variant="caption" muted style={{ marginTop: spacing.xs }}>Clear answers on cycles, comfort, and when to seek care.</Text>
                 </View>
                 <Ionicons name="chevron-forward" size={18} color={colors.gray400} />
               </Card>
@@ -120,6 +125,140 @@ function RoleHealthCard({ accent }: { accent: string }) {
 
 function HealthStat({ label, value, accent }: { label: string; value: string; accent: string }) {
   return <View style={styles.healthStat}><Text variant="caption" muted>{label}</Text><Text variant="label" color={accent} style={{ marginTop: spacing.xs }}>{value}</Text></View>
+}
+
+// Boy learn paths — each tile deep-links Learn with a search preset so
+// destinations actually differ instead of all landing on the same list.
+const BOY_PATHS: Array<{ title: string; summary: string; icon: keyof typeof Ionicons.glyphMap; query: string }> = [
+  { title: 'Protection & testing', summary: 'Condoms, testing, and safer choices.', icon: 'shield-checkmark-outline', query: 'protection' },
+  { title: 'Know your body', summary: 'Puberty, hygiene, and what is normal.', icon: 'fitness-outline', query: 'health' },
+  { title: 'Respect & consent', summary: 'Boundaries, pressure, and healthy talks.', icon: 'chatbubble-ellipses-outline', query: 'conversation' },
+  { title: 'When to seek help', summary: 'Symptoms that deserve a professional.', icon: 'medkit-outline', query: 'help' },
+]
+
+function BoyHome({ accent }: { accent: string }) {
+  const nav = useTabNav()
+  const [kitCount, setKitCount] = useState<number | null>(null)
+  const [activeOrder, setActiveOrder] = useState<ApiOrder | null>(null)
+
+  useFocusEffect(
+    useCallback(() => {
+      let alive = true
+      api
+        .get<{ products: ApiProduct[] }>('/products?role=boy')
+        .then((res) => {
+          if (alive) setKitCount(res.data.products.length)
+        })
+        .catch(() => {
+          if (alive) setKitCount(null)
+        })
+      api
+        .get<{ orders: ApiOrder[] }>('/orders')
+        .then((res) => {
+          if (!alive) return
+          const ongoing = res.data.orders.find((o) => ['pending', 'confirmed', 'shipped'].includes(o.status))
+          setActiveOrder(ongoing ?? null)
+        })
+        .catch(() => {
+          if (alive) setActiveOrder(null)
+        })
+      return () => {
+        alive = false
+      }
+    }, []),
+  )
+
+  return (
+    <View style={{ gap: spacing.lg }}>
+      {/* Protection kit — the boy equivalent of the cycle shop banner. */}
+      <Card style={[styles.hero, { backgroundColor: roleColors.boy.soft }]}>
+        <View style={styles.heroCopy}>
+          <Text variant="caption" color={accent}>YOUR KIT</Text>
+          <Text variant="title" style={{ marginTop: spacing.xs }}>Stay protected</Text>
+          <Text muted style={{ marginTop: spacing.sm, lineHeight: 21 }}>
+            {kitCount === null ? 'Protection essentials picked for you.' : `${kitCount} protection essential${kitCount === 1 ? '' : 's'} picked for you.`}
+          </Text>
+          <TouchableOpacity
+            accessibilityRole="button"
+            accessibilityLabel="Shop protection essentials"
+            onPress={() => nav.navigate('Shop')}
+            style={{ marginTop: spacing.md, alignSelf: 'flex-start', backgroundColor: accent, borderRadius: 999, paddingHorizontal: spacing.lg, paddingVertical: spacing.sm }}
+          >
+            <Text style={{ color: colors.white, fontWeight: '600' }}>Shop protection</Text>
+          </TouchableOpacity>
+        </View>
+        <View style={[styles.heroMark, { backgroundColor: accent }]}>
+          <Ionicons name="shield-checkmark-outline" size={28} color={colors.white} />
+        </View>
+      </Card>
+
+      {/* Learn paths — distinct filtered destinations. */}
+      <View style={styles.sectionHeader}>
+        <Text variant="heading">Learn your way</Text>
+        <TouchableOpacity accessibilityLabel="Open all education topics" onPress={() => nav.navigate('Learn')}>
+          <Text variant="caption" color={accent}>See all</Text>
+        </TouchableOpacity>
+      </View>
+      <View style={styles.metricGrid}>
+        {BOY_PATHS.slice(0, 2).map((path) => (
+          <BoyPathTile key={path.title} path={path} accent={accent} />
+        ))}
+      </View>
+      <View style={styles.metricGrid}>
+        {BOY_PATHS.slice(2).map((path) => (
+          <BoyPathTile key={path.title} path={path} accent={accent} />
+        ))}
+      </View>
+
+      {/* Own tracking — boys can use check-ins too. */}
+      <WellnessCheckinCard accent={accent} />
+
+      {/* Live order state — a reason to come back. */}
+      {activeOrder ? (
+        <TouchableOpacity accessibilityLabel={`Open order ${activeOrder.id}`} onPress={() => nav.navigate('Orders')}>
+          <Card style={styles.insightCard}>
+            <View style={[styles.insightIcon, { backgroundColor: roleColors.boy.soft }]}>
+              <Ionicons name="receipt-outline" size={20} color={accent} />
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text variant="label" style={{ textTransform: 'capitalize' }}>Order #{activeOrder.id} · {activeOrder.status}</Text>
+              <Text variant="caption" muted style={{ marginTop: spacing.xs }}>Tap to track it — we will call you about delivery.</Text>
+            </View>
+            <Ionicons name="chevron-forward" size={18} color={colors.gray400} />
+          </Card>
+        </TouchableOpacity>
+      ) : null}
+
+      {/* Human help entry point. */}
+      <TouchableOpacity accessibilityLabel="Ask a health expert" onPress={() => nav.navigate('Messages')}>
+        <Card style={styles.insightCard}>
+          <View style={[styles.insightIcon, { backgroundColor: roleColors.boy.soft }]}>
+            <Ionicons name="chatbubble-ellipses-outline" size={20} color={accent} />
+          </View>
+          <View style={{ flex: 1 }}>
+            <Text variant="label">Ask an expert</Text>
+            <Text variant="caption" muted style={{ marginTop: spacing.xs }}>Private answers from the MyCare+ care team.</Text>
+          </View>
+          <Ionicons name="chevron-forward" size={18} color={colors.gray400} />
+        </Card>
+      </TouchableOpacity>
+    </View>
+  )
+}
+
+function BoyPathTile({ path, accent }: { path: (typeof BOY_PATHS)[number]; accent: string }) {
+  const nav = useTabNav()
+  return (
+    <TouchableOpacity style={{ flex: 1 }} accessibilityLabel={`Learn about ${path.title}`} onPress={() => nav.navigate('Learn', { query: path.query })}>
+      <Card style={styles.metricTile}>
+        <View style={[styles.metricIcon, { backgroundColor: roleColors.boy.soft }]}>
+          <Ionicons name={path.icon} size={18} color={accent} />
+        </View>
+        <Text variant="label" style={{ marginTop: spacing.sm }}>{path.title}</Text>
+        <Text variant="caption" muted style={{ marginTop: spacing.xs }}>{path.summary}</Text>
+      </Card>
+    </TouchableOpacity>
+  )
 }
 
 function ChildrenSummary({ accent }: { accent: string }) {
@@ -237,28 +376,6 @@ function MessagesTab({ role }: { role: TabRole }) {
 
 function TrackTab({ role }: { role: TabRole }) {
   const accent = roleColors[role].accent
-  const [activeCheckin, setActiveCheckin] = useState<'Mood' | 'Energy' | 'Sleep' | null>(null)
-  const [checkins, setCheckins] = useState<Record<string, string>>({})
-  const choices = ['Low', 'Okay', 'Good']
-
-  const selectCheckin = (choice: string) => {
-    if (!activeCheckin) return
-    const next = { ...checkins, [activeCheckin]: choice }
-    setCheckins(next)
-    const timeZone = (() => { try { return Intl.DateTimeFormat().resolvedOptions().timeZone } catch { return undefined } })()
-    api.put('/health/check-ins', { date: new Date().toISOString().slice(0, 10), timeZone, mood: next.Mood, energy: next.Energy, sleep: next.Sleep }).catch(() => undefined)
-    setActiveCheckin(null)
-  }
-
-  useFocusEffect(useCallback(() => {
-    let alive = true
-    api.get<{ checkIns: Array<{ date: string; mood?: string; energy?: string; sleep?: string }> }>('/health/check-ins').then((response) => {
-      const today = new Date().toISOString().slice(0, 10)
-      const entry = response.data.checkIns.find((checkIn) => checkIn.date.slice(0, 10) === today)
-      if (alive && entry) setCheckins({ Mood: entry.mood || '', Energy: entry.energy || '', Sleep: entry.sleep || '' })
-    }).catch(() => undefined)
-    return () => { alive = false }
-  }, []))
 
   return (
     <TabScreen>
@@ -269,20 +386,7 @@ function TrackTab({ role }: { role: TabRole }) {
         ) : (
           <>
             <GirlCyclePanel accent={accent} />
-            <Card>
-          <Text variant="heading">Daily check-in</Text>
-          <Text muted style={{ marginTop: spacing.xs }}>A few quick notes help you notice patterns over time.</Text>
-          <View style={styles.checkinRow}>
-            <CheckinItem icon="happy-outline" label="Mood" value={checkins.Mood} accent={accent} onPress={() => setActiveCheckin('Mood')} />
-            <CheckinItem icon="flash-outline" label="Energy" value={checkins.Energy} accent={accent} onPress={() => setActiveCheckin('Energy')} />
-            <CheckinItem icon="moon-outline" label="Sleep" value={checkins.Sleep} accent={accent} onPress={() => setActiveCheckin('Sleep')} />
-          </View>
-          {activeCheckin ? <View style={styles.choicePanel}>
-            <Text variant="label">How was your {activeCheckin.toLowerCase()}?</Text>
-            <View style={styles.choiceRow}>{choices.map((choice) => <TouchableOpacity key={choice} onPress={() => selectCheckin(choice)} style={[styles.choiceButton, { borderColor: accent, backgroundColor: checkins[activeCheckin] === choice ? accent : colors.surface }]}><Text variant="caption" color={checkins[activeCheckin] === choice ? colors.white : accent}>{choice}</Text></TouchableOpacity>)}</View>
-          </View> : null}
-          <Text variant="caption" muted style={{ marginTop: spacing.md }}>Saved to your private health profile with timezone-safe dates.</Text>
-        </Card>
+            <WellnessCheckinCard accent={accent} />
         <HealthProfilePanel accent={accent} />
           </>
         )}
@@ -320,20 +424,19 @@ function ParentTrackSection({ accent }: { accent: string }) {
   )
 }
 
-function CheckinItem({ icon, label, value, accent, onPress }: { icon: keyof typeof Ionicons.glyphMap; label: string; value?: string; accent: string; onPress: () => void }) {
-  return (
-    <TouchableOpacity accessibilityLabel={`Record ${label}`} onPress={onPress} style={styles.checkinItem}>
-      <View style={[styles.checkinIcon, { borderColor: accent }]}><Ionicons name={icon} size={19} color={accent} /></View>
-      <Text variant="caption" color={value ? accent : colors.gray500} style={{ marginTop: spacing.xs }}>{value || label}</Text>
-    </TouchableOpacity>
-  )
-}
-
 function LearnTab({ role }: { role: TabRole }) {
   const accent = roleColors[role].accent
   const [articles, setArticles] = useState<Array<{ id: string; title: string; summary: string; body?: string; category: string }>>([])
   const [query, setQuery] = useState('')
   const [category, setCategory] = useState('All')
+  // Deep-link presets from Home tiles, e.g. navigate('Learn', { query: 'protection' }).
+  const route = useRoute<{ key: string; name: string; params?: { query?: string; category?: string } }>()
+  useFocusEffect(
+    useCallback(() => {
+      if (typeof route.params?.query === 'string') setQuery(route.params.query)
+      if (typeof route.params?.category === 'string') setCategory(route.params.category)
+    }, [route.params]),
+  )
   const [showAll, setShowAll] = useState(false)
   const [learnError, setLearnError] = useState('')
   const [selectedArticle, setSelectedArticle] = useState<{ title: string; summary: string; body?: string; category: string } | null>(null)
@@ -482,20 +585,255 @@ function OrdersTab({ role }: { role: TabRole }) {
   )
 }
 
-function ProfileTab({ role }: { role: TabRole }) {
-  const { user, logout } = useAuth()
-  const [leaving, setLeaving] = useState(false)
+const LANG_KEY = 'mycareplus_lang'
+
+/** Change password for the signed-in account (all roles). Success signs out everywhere. */
+function SecurityCard({ accent }: { accent: string }) {
+  const { logout } = useAuth()
+  const [current, setCurrent] = useState('')
+  const [next, setNext] = useState('')
+  const [confirm, setConfirm] = useState('')
+  const [saving, setSaving] = useState(false)
+
+  const submit = async () => {
+    if (!current) {
+      Alert.alert('Check entries', 'Enter your current password.')
+      return
+    }
+    if (next.length < 8) {
+      Alert.alert('Check entries', 'The new password needs at least 8 characters.')
+      return
+    }
+    if (next !== confirm) {
+      Alert.alert('Check entries', 'The new passwords do not match.')
+      return
+    }
+    setSaving(true)
+    try {
+      const res = await api.post<{ message?: string }>('/auth/change-password', { currentPassword: current, newPassword: next })
+      setCurrent('')
+      setNext('')
+      setConfirm('')
+      Alert.alert('Password changed', res.data.message ?? 'Please log in again.', [{ text: 'OK', onPress: () => logout() }])
+    } catch (e) {
+      Alert.alert('Could not change password', apiErrorMessage(e))
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  return (
+    <Card>
+      <Text variant="heading">Security</Text>
+      <View style={{ marginTop: spacing.md, gap: spacing.sm }}>
+        <PasswordField label="Current password" value={current} onChangeText={setCurrent} />
+        <PasswordField label="New password" value={next} onChangeText={setNext} />
+        <PasswordField label="Confirm new password" value={confirm} onChangeText={setConfirm} />
+      </View>
+      <Button title="Change password" onPress={submit} loading={saving} accent={accent} style={{ marginTop: spacing.md }} />
+      <Text variant="caption" muted>Changing your password signs you out on all devices.</Text>
+    </Card>
+  )
+}
+
+/** Boy data rights: check-in count + export + delete (girls get this via HealthProfilePanel). */
+function BoyWellnessDataCard({ accent }: { accent: string }) {
+  const [count, setCount] = useState<number | null>(null)
+  const [busy, setBusy] = useState(false)
+
+  useFocusEffect(
+    useCallback(() => {
+      let alive = true
+      api
+        .get<{ checkIns: unknown[] }>('/health/check-ins')
+        .then((res) => {
+          if (alive) setCount(res.data.checkIns.length)
+        })
+        .catch(() => {
+          if (alive) setCount(null)
+        })
+      return () => {
+        alive = false
+      }
+    }, []),
+  )
+
+  const exportData = async () => {
+    setBusy(true)
+    try {
+      const res = await api.get('/health/export')
+      await Share.share({ message: JSON.stringify(res.data, null, 2), title: 'MyCare+ data export' })
+    } catch (e) {
+      Alert.alert('Could not export', apiErrorMessage(e))
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  const deleteData = () => {
+    Alert.alert('Delete wellness data?', 'This permanently removes your check-ins. This cannot be undone.', [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Delete',
+        style: 'destructive',
+        onPress: async () => {
+          try {
+            await api.delete('/health/data')
+            setCount(0)
+            Alert.alert('Deleted', 'Your wellness data was removed.')
+          } catch (e) {
+            Alert.alert('Could not delete', apiErrorMessage(e))
+          }
+        },
+      },
+    ])
+  }
+
+  return (
+    <Card>
+      <Text variant="heading">My wellness data</Text>
+      <Text muted style={{ marginTop: spacing.xs }}>
+        {count === null ? 'Your private check-ins live here.' : `${count} check-in${count === 1 ? '' : 's'} stored privately.`}
+      </Text>
+      <View style={{ flexDirection: 'row', gap: spacing.sm, marginTop: spacing.md }}>
+        <View style={{ flex: 1 }}>
+          <Button title={busy ? 'Working…' : 'Export'} variant="secondary" onPress={exportData} disabled={busy} />
+        </View>
+        <View style={{ flex: 1 }}>
+          <Button title="Delete" variant="danger" onPress={deleteData} disabled={busy} />
+        </View>
+      </View>
+    </Card>
+  )
+}
+
+function SupportRow({ icon, title, subtitle, onPress }: { icon: keyof typeof Ionicons.glyphMap; title: string; subtitle: string; onPress: () => void }) {
+  return (
+    <TouchableOpacity accessibilityLabel={title} onPress={onPress} style={styles.articleRow}>
+      <View style={[styles.articleIcon, { backgroundColor: colors.gray100 }]}>
+        <Ionicons name={icon} size={20} color={colors.ink} />
+      </View>
+      <View style={{ flex: 1 }}>
+        <Text variant="label">{title}</Text>
+        <Text variant="caption" muted style={{ marginTop: spacing.xs }}>{subtitle}</Text>
+      </View>
+      <Ionicons name="chevron-forward" size={18} color={colors.gray400} />
+    </TouchableOpacity>
+  )
+}
+
+/** Help, trust, and about links (all roles). */
+function SupportCard({ accent }: { accent: string }) {
+  const nav = useTabNav()
+  return (
+    <Card>
+      <Text variant="heading">Support & trust</Text>
+      <View style={{ marginTop: spacing.md, gap: spacing.md }}>
+        <SupportRow icon="chatbubble-ellipses-outline" title="Ask an expert" subtitle="Private answers from the care team." onPress={() => nav.navigate('Messages')} />
+        <SupportRow
+          icon="information-circle-outline"
+          title="About MyCare+"
+          subtitle="What this app is for."
+          onPress={() => nav.navigate('About')}
+        />
+        <SupportRow
+          icon="lock-closed-outline"
+          title="Privacy"
+          subtitle="How your data is handled."
+          onPress={() => nav.navigate('Privacy')}
+        />
+      </View>
+      <Text variant="caption" muted style={{ marginTop: spacing.md, color: accent }}>
+        MyCare+ gives health information, not medical diagnosis. Seek a professional for concerning symptoms.
+      </Text>
+    </Card>
+  )
+}
+
+/** Shell for Profile sub-pages (Security / About / Privacy) with a back link. */
+function ProfileSubPage({ title, role, children }: { title: string; role: TabRole; children: React.ReactNode }) {
+  const nav = useTabNav()
+  return (
+    <TabScreen>
+      <AppHeader role={role} title={title} />
+      <ScrollView contentContainerStyle={styles.content}>
+        <TouchableOpacity accessibilityRole="button" accessibilityLabel="Back to profile" onPress={() => nav.navigate('Profile')} style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.xs }}>
+          <Ionicons name="chevron-back" size={18} color={roleColors[role].accent} />
+          <Text variant="caption" color={roleColors[role].accent}>Profile</Text>
+        </TouchableOpacity>
+        {children}
+      </ScrollView>
+    </TabScreen>
+  )
+}
+
+function SecurityScreen({ role }: { role: TabRole }) {
+  return (
+    <ProfileSubPage title="Security" role={role}>
+      <SecurityCard accent={roleColors[role].accent} />
+    </ProfileSubPage>
+  )
+}
+
+function AboutScreen({ role }: { role: TabRole }) {
+  return (
+    <ProfileSubPage title="About" role={role}>
+      <Card>
+        <Text variant="caption" color={roleColors[role].accent}>MYCARE+</Text>
+        <Text variant="title" style={{ marginTop: spacing.xs }}>Care. Educate. Empower.</Text>
+        <Text muted style={{ marginTop: spacing.sm, lineHeight: 21 }}>
+          MyCare+ helps you learn about your health, get care essentials delivered with a simple call-to-confirm order, and reach real experts privately.
+        </Text>
+      </Card>
+      <Card>
+        <Text variant="heading">What you can do here</Text>
+        <View style={{ marginTop: spacing.sm, gap: spacing.sm }}>
+          <Text muted style={{ lineHeight: 21 }}>• Track wellness with private daily check-ins.</Text>
+          <Text muted style={{ lineHeight: 21 }}>• Learn from trusted, reviewed education topics.</Text>
+          <Text muted style={{ lineHeight: 21 }}>• Shop care essentials and order with a callback number.</Text>
+          <Text muted style={{ lineHeight: 21 }}>• Message the care team for private support.</Text>
+        </View>
+      </Card>
+      <Card>
+        <Text variant="heading">Version</Text>
+        <Text muted style={{ marginTop: spacing.xs }}>MyCare+ 1.0.0 · built by the MyCare+ care team.</Text>
+      </Card>
+    </ProfileSubPage>
+  )
+}
+
+function PrivacyScreen({ role }: { role: TabRole }) {
+  return (
+    <ProfileSubPage title="Privacy" role={role}>
+      <Card>
+        <Text variant="heading">What we store</Text>
+        <Text muted style={{ marginTop: spacing.sm, lineHeight: 21 }}>
+          Your account details, private wellness check-ins, orders with callback numbers, and support messages. Health data is tied only to your account.
+        </Text>
+      </Card>
+      <Card>
+        <Text variant="heading">Who can see it</Text>
+        <Text muted style={{ marginTop: spacing.sm, lineHeight: 21 }}>
+          Only you — except orders and support chats, which admins see to fulfil deliveries and answer you. Nothing is sold or shared.
+        </Text>
+      </Card>
+      <Card>
+        <Text variant="heading">Your rights</Text>
+        <Text muted style={{ marginTop: spacing.sm, lineHeight: 21 }}>
+          Export or delete your wellness data at any time from Profile{role === 'boy' ? ' → My wellness data' : ' → your health panel'}. Changing your password signs you out on all devices.
+        </Text>
+      </Card>
+    </ProfileSubPage>
+  )
+}
+
+/** Account details + edit form. Lives on the Account page. */
+function AccountCard({ accent }: { accent: string }) {
+  const { user, refreshUser } = useAuth()
   const [editing, setEditing] = useState(false)
   const [fullName, setFullName] = useState('')
   const [phone, setPhone] = useState('')
   const [saving, setSaving] = useState(false)
-  const [reminders, setReminders] = useState(true)
-  const [orderUpdates, setOrderUpdates] = useState(true)
-  const handleLogout = async () => {
-    setLeaving(true)
-    try { await logout() }
-    finally { setLeaving(false) }
-  }
   const startEdit = () => {
     setFullName(user?.fullName ?? '')
     setPhone(user?.phone ?? '')
@@ -509,46 +847,137 @@ function ProfileTab({ role }: { role: TabRole }) {
     setSaving(true)
     try {
       await api.patch('/auth/profile', { fullName: fullName.trim(), phone: phone.trim() || undefined })
-      Alert.alert('Saved', 'Your profile was updated. Pull to refresh on next open.')
+      await refreshUser()
+      Alert.alert('Saved', 'Your profile was updated.')
       setEditing(false)
     } catch (e) {
       Alert.alert('Could not save', apiErrorMessage(e))
     } finally { setSaving(false) }
   }
   return (
+    <Card>
+      <View style={styles.sectionHeader}>
+        <Text variant="caption" color={accent}>ACCOUNT</Text>
+        <TouchableOpacity accessibilityLabel="Edit profile" onPress={() => (editing ? saveEdit() : startEdit())}>
+          <Text variant="caption" color={accent}>{editing ? (saving ? 'Saving…' : 'Save') : 'Edit'}</Text>
+        </TouchableOpacity>
+      </View>
+      {editing ? (
+        <View style={{ marginTop: spacing.md, gap: spacing.sm }}>
+          <Input label="Full name" value={fullName} onChangeText={setFullName} />
+          <Input label="Phone" value={phone} onChangeText={setPhone} keyboardType="phone-pad" />
+        </View>
+      ) : (
+        <>
+          <Text variant="title" style={{ marginTop: spacing.xs }}>{user?.fullName ?? '—'}</Text>
+          <Text muted style={{ marginTop: spacing.xs }}>{user?.email ?? '—'}</Text>
+          {user?.phone ? <Text muted style={{ marginTop: spacing.xs }}>{user.phone}</Text> : null}
+        </>
+      )}
+      <Text variant="caption" muted style={{ marginTop: spacing.sm, textTransform: 'capitalize' }}>
+        {user?.role ?? '—'} · member since {user?.createdAt ? new Date(user.createdAt).toLocaleDateString() : '—'}
+      </Text>
+    </Card>
+  )
+}
+
+/** Notification + language preferences. Lives on the Preferences page. */
+function PreferencesCard({ role, accent }: { role: TabRole; accent: string }) {
+  const [reminders, setReminders] = useState(true)
+  const [orderUpdates, setOrderUpdates] = useState(true)
+  const [lang, setLang] = useState('en')
+  useFocusEffect(
+    useCallback(() => {
+      let alive = true
+      getNotifPrefs()
+        .then((prefs) => {
+          if (!alive) return
+          setReminders(prefs.reminders)
+          setOrderUpdates(prefs.orderUpdates)
+        })
+        .catch(() => undefined)
+      AsyncStorage.getItem(LANG_KEY)
+        .then((value) => {
+          if (alive && (value === 'en' || value === 'rw')) setLang(value)
+        })
+        .catch(() => undefined)
+      return () => {
+        alive = false
+      }
+    }, []),
+  )
+  const toggleReminders = (value: boolean) => {
+    setReminders(value)
+    setNotifPrefs({ reminders: value, orderUpdates }).catch(() => undefined)
+  }
+  const toggleOrderUpdates = (value: boolean) => {
+    setOrderUpdates(value)
+    setNotifPrefs({ reminders, orderUpdates: value }).catch(() => undefined)
+  }
+  const changeLang = (value: string) => {
+    setLang(value)
+    AsyncStorage.setItem(LANG_KEY, value).catch(() => undefined)
+  }
+  return (
+    <Card>
+      <Text variant="heading">Notification preferences</Text>
+      {role !== 'boy' ? (
+        <View style={styles.prefRow}><Text style={{ flex: 1 }}>Cycle reminders</Text><Switch value={reminders} onValueChange={toggleReminders} /></View>
+      ) : null}
+      <View style={styles.prefRow}><Text style={{ flex: 1 }}>Order updates</Text><Switch value={orderUpdates} onValueChange={toggleOrderUpdates} /></View>
+      <Text variant="heading" style={{ marginTop: spacing.md }}>Language</Text>
+      <View style={{ marginTop: spacing.sm }}>
+        <Segmented tabs={[{ key: 'en', label: 'English' }, { key: 'rw', label: 'Kinyarwanda' }]} value={lang} onChange={changeLang} accent={accent} />
+      </View>
+      <Text variant="caption" muted>Stored on this device{role !== 'boy' ? '; reminders use your timezone-safe health dates' : ''}. Kinyarwanda content is coming soon.</Text>
+    </Card>
+  )
+}
+
+function AccountScreen({ role }: { role: TabRole }) {
+  return (
+    <ProfileSubPage title="Account" role={role}>
+      <AccountCard accent={roleColors[role].accent} />
+    </ProfileSubPage>
+  )
+}
+
+function PreferencesScreen({ role }: { role: TabRole }) {
+  return (
+    <ProfileSubPage title="Preferences" role={role}>
+      <PreferencesCard role={role} accent={roleColors[role].accent} />
+    </ProfileSubPage>
+  )
+}
+
+function ProfileTab({ role }: { role: TabRole }) {
+  const { logout } = useAuth()
+  const nav = useTabNav()
+  const [leaving, setLeaving] = useState(false)
+  const handleLogout = async () => {
+    setLeaving(true)
+    try { await logout() }
+    finally { setLeaving(false) }
+  }
+  return (
     <TabScreen>
       <AppHeader role={role} title="Profile" />
       <ScrollView contentContainerStyle={styles.content}>
         <Card>
-          <View style={styles.sectionHeader}>
-            <Text variant="caption" color={roleColors[role].accent}>ACCOUNT</Text>
-            <TouchableOpacity accessibilityLabel="Edit profile" onPress={() => (editing ? saveEdit() : startEdit())}>
-              <Text variant="caption" color={roleColors[role].accent}>{editing ? (saving ? 'Saving…' : 'Save') : 'Edit'}</Text>
-            </TouchableOpacity>
+          <View style={{ gap: spacing.md }}>
+            <SupportRow icon="person-outline" title="Account" subtitle="Name, email, phone." onPress={() => nav.navigate('Account')} />
+            <SupportRow icon="options-outline" title="Preferences" subtitle="Notifications, language." onPress={() => nav.navigate('Preferences')} />
+            <SupportRow icon="key-outline" title="Security" subtitle="Change your password." onPress={() => nav.navigate('Security')} />
           </View>
-          {editing ? (
-            <View style={{ marginTop: spacing.md, gap: spacing.sm }}>
-              <Input label="Full name" value={fullName} onChangeText={setFullName} />
-              <Input label="Phone" value={phone} onChangeText={setPhone} keyboardType="phone-pad" />
-            </View>
-          ) : (
-            <>
-              <Text variant="title" style={{ marginTop: spacing.xs }}>{user?.fullName ?? '—'}</Text>
-              <Text muted style={{ marginTop: spacing.xs }}>{user?.email ?? '—'}</Text>
-              {user?.phone ? <Text muted style={{ marginTop: spacing.xs }}>{user.phone}</Text> : null}
-            </>
-          )}
-          <Text variant="caption" muted style={{ marginTop: spacing.sm, textTransform: 'capitalize' }}>
-            {user?.role ?? role} · member since {user?.createdAt ? new Date(user.createdAt).toLocaleDateString() : '—'}
-          </Text>
         </Card>
-        <Card>
-          <Text variant="heading">Notification preferences</Text>
-          <View style={styles.prefRow}><Text style={{ flex: 1 }}>Cycle reminders</Text><Switch value={reminders} onValueChange={setReminders} /></View>
-          <View style={styles.prefRow}><Text style={{ flex: 1 }}>Order updates</Text><Switch value={orderUpdates} onValueChange={setOrderUpdates} /></View>
-          <Text variant="caption" muted>Stored on this device; reminders use your timezone-safe health dates.</Text>
-        </Card>
-        {role !== 'boy' ? <HealthProfilePanel accent={roleColors[role].accent} /> : null}
+        {role === 'boy' ? <BoyWellnessDataCard accent={roleColors[role].accent} /> : null}
+        {role === 'girl' ? (
+          <Card>
+            <SupportRow icon="heart-outline" title="Health profile" subtitle="Cycle, symptoms, consent, data." onPress={() => nav.navigate('Track')} />
+          </Card>
+        ) : null}
+        {role === 'parent' ? <HealthProfilePanel accent={roleColors[role].accent} /> : null}
+        <SupportCard accent={roleColors[role].accent} />
         <Button title="Log out" onPress={handleLogout} loading={leaving} accent={colors.danger} />
       </ScrollView>
     </TabScreen>
@@ -641,6 +1070,21 @@ export default function RoleTabs({ role }: { role: TabRole }) {
       <Tab.Screen name="Profile" options={{ tabBarButton: () => null, tabBarItemStyle: styles.hiddenTab }}>
         {() => <ProfileTab role={role} />}
       </Tab.Screen>
+      <Tab.Screen name="Account" options={{ tabBarButton: () => null, tabBarItemStyle: styles.hiddenTab }}>
+        {() => <AccountScreen role={role} />}
+      </Tab.Screen>
+      <Tab.Screen name="Preferences" options={{ tabBarButton: () => null, tabBarItemStyle: styles.hiddenTab }}>
+        {() => <PreferencesScreen role={role} />}
+      </Tab.Screen>
+      <Tab.Screen name="Security" options={{ tabBarButton: () => null, tabBarItemStyle: styles.hiddenTab }}>
+        {() => <SecurityScreen role={role} />}
+      </Tab.Screen>
+      <Tab.Screen name="About" options={{ tabBarButton: () => null, tabBarItemStyle: styles.hiddenTab }}>
+        {() => <AboutScreen role={role} />}
+      </Tab.Screen>
+      <Tab.Screen name="Privacy" options={{ tabBarButton: () => null, tabBarItemStyle: styles.hiddenTab }}>
+        {() => <PrivacyScreen role={role} />}
+      </Tab.Screen>
     </Tab.Navigator>
     </ChildProvider>
   )
@@ -659,17 +1103,11 @@ const styles = StyleSheet.create({
   metricIcon: { width: 36, height: 36, borderRadius: 18, alignItems: 'center', justifyContent: 'center' },
   insightCard: { flexDirection: 'row', alignItems: 'center', gap: spacing.md },
   insightIcon: { width: 42, height: 42, borderRadius: 21, alignItems: 'center', justifyContent: 'center' },
-  checkinRow: { flexDirection: 'row', justifyContent: 'space-between', marginTop: spacing.xl },
-  checkinItem: { alignItems: 'center', flex: 1 },
-  checkinIcon: { width: 46, height: 46, borderRadius: 23, borderWidth: 1.5, alignItems: 'center', justifyContent: 'center' },
   healthActionRow: { flexDirection: 'row', gap: spacing.sm, marginTop: spacing.lg },
   healthStat: { flex: 1, backgroundColor: colors.gray100, borderRadius: radius.md, padding: spacing.md },
   childrenCard: { paddingBottom: spacing.sm },
   childPlaceholder: { flexDirection: 'row', alignItems: 'center', gap: spacing.md, marginTop: spacing.lg, paddingVertical: spacing.sm },
   childAvatar: { width: 44, height: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center' },
-  choicePanel: { marginTop: spacing.lg, padding: spacing.md, borderRadius: radius.md, backgroundColor: colors.gray100 },
-  choiceRow: { flexDirection: 'row', gap: spacing.sm, marginTop: spacing.sm },
-  choiceButton: { flex: 1, alignItems: 'center', borderWidth: 1, borderRadius: radius.pill, paddingVertical: spacing.sm },
   learnIntro: { minHeight: 170, justifyContent: 'flex-end' },
   articleRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.md },
   articleIcon: { width: 44, height: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center' },

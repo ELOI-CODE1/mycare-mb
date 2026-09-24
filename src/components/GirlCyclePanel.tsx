@@ -1,28 +1,61 @@
-import React, { useEffect, useMemo, useState } from 'react'
+import React, { useCallback, useMemo, useState } from 'react'
 import { Alert, StyleSheet, TextInput, TouchableOpacity, View } from 'react-native'
-import { useNavigation } from '@react-navigation/native'
+import { useFocusEffect, useNavigation } from '@react-navigation/native'
 import { Calendar } from 'react-native-calendars'
 import { format, isValid, parseISO } from 'date-fns'
+import { Ionicons } from '@expo/vector-icons'
 import { Button, Card, Text } from './ui'
 import DateField from './DateField'
 import { colors, radius, spacing } from '../theme'
 import PeriodPredictor from '../utils/periodPredictor.ts'
-import { addPeriodLog, loadPeriodLogs, periodDays, type PeriodLog } from '../utils/periodStorage'
-import { requestPermissions, schedulePeriodNotifications, setupNotificationChannel } from '../utils/notificationService'
+import { addPeriodLog, dropPendingLog, loadPendingLogs, loadPeriodLogs, periodDays, queuePendingLog, removePeriodLog, type PeriodLog } from '../utils/periodStorage'
 import { api, apiErrorMessage } from '../api/client'
+
+type CycleLog = PeriodLog & { id?: string }
 
 export default function GirlCyclePanel({ accent, mode = 'record' }: { accent: string; mode?: 'present' | 'record' }) {
   const navigation = useNavigation<{ navigate: (screen: string) => void }>()
-  const [periodLogs, setPeriodLogs] = useState<PeriodLog[]>([])
+  const [periodLogs, setPeriodLogs] = useState<CycleLog[]>([])
   const [startDate, setStartDate] = useState(format(new Date(), 'yyyy-MM-dd'))
   const [duration, setDuration] = useState('5')
   const [symptoms, setSymptoms] = useState('')
   const [formError, setFormError] = useState('')
   const canRecord = mode === 'record'
 
-  useEffect(() => {
-    api.get<{ periods: PeriodLog[] }>('/health/periods').then((response) => setPeriodLogs(response.data.periods.map((period) => ({ ...period, startDate: period.startDate.slice(0, 10) })))).catch(() => loadPeriodLogs().then(setPeriodLogs))
-  }, [])
+  // Fresh on every focus (tabs stay mounted) + flush offline queue first.
+  useFocusEffect(
+    useCallback(() => {
+      let alive = true
+      ;(async () => {
+        const timeZone = (() => {
+          try {
+            return Intl.DateTimeFormat().resolvedOptions().timeZone
+          } catch {
+            return undefined
+          }
+        })()
+        // Push offline-saved logs (server upserts by date — idempotent).
+        const pending = await loadPendingLogs()
+        for (const log of pending) {
+          try {
+            await api.post('/health/periods', { startDate: log.startDate, duration: log.duration, timeZone })
+            await dropPendingLog(log.startDate)
+          } catch {
+            break // still offline — keep the rest queued
+          }
+        }
+        try {
+          const response = await api.get<{ periods: CycleLog[] }>('/health/periods')
+          if (alive) setPeriodLogs(response.data.periods.map((period) => ({ ...period, startDate: period.startDate.slice(0, 10) })))
+        } catch {
+          if (alive) setPeriodLogs(await loadPeriodLogs())
+        }
+      })()
+      return () => {
+        alive = false
+      }
+    }, []),
+  )
 
   const periodDates = useMemo(() => periodLogs.map((log) => log.startDate), [periodLogs])
   const prediction = useMemo(() => new PeriodPredictor(periodDates).predict(), [periodDates])
@@ -33,13 +66,8 @@ export default function GirlCyclePanel({ accent, mode = 'record' }: { accent: st
     const avg = cycles.length > 0 ? Math.round(cycles.reduce((n, c) => n + c.length, 0) / cycles.length) : null
     return { cycles: cycles.length, avg, variation: prediction.variation }
   }, [periodDates, prediction.variation])
-  useEffect(() => {
-    if (!prediction.predictedRange) return
-    setupNotificationChannel().catch(() => undefined)
-    requestPermissions().then((granted) => {
-      if (granted) schedulePeriodNotifications(prediction.predictedRange).catch(() => undefined)
-    })
-  }, [prediction.predictedRange])
+  // Reminder scheduling lives in usePeriodReminderSync (App-level, once) — never here:
+  // this panel mounts twice (Home + Track) and must not prompt or reschedule.
   const markedDates = useMemo(() => {
     const marked: Record<string, any> = {}
     periodLogs.forEach((log) => periodDays(log).forEach((date) => { marked[date] = { selected: true, selectedColor: accent, marked: true } }))
@@ -79,10 +107,30 @@ export default function GirlCyclePanel({ accent, mode = 'record' }: { accent: st
       setSymptoms('')
       Alert.alert('Period recorded', 'Your prediction will update from this period history.')
     } catch (error) {
-      const next = await addPeriodLog(startDate, parsedDuration)
-      setPeriodLogs(next)
-      Alert.alert('Saved on this device', apiErrorMessage(error, 'The health service is unavailable right now.'))
+      await addPeriodLog(startDate, parsedDuration)
+      await queuePendingLog(startDate, parsedDuration)
+      setPeriodLogs(await loadPeriodLogs())
+      Alert.alert('Saved on this device', 'We will send it to your account when you are back online.')
     }
+  }
+
+  const deleteLog = (log: CycleLog) => {
+    Alert.alert('Delete this period?', `${log.startDate} · ${log.duration} days. This cannot be undone.`, [
+      { text: 'Keep', style: 'cancel' },
+      {
+        text: 'Delete',
+        style: 'destructive',
+        onPress: async () => {
+          try {
+            if (log.id) await api.delete(`/health/periods/${log.id}`)
+            setPeriodLogs((current) => current.filter((p) => p.startDate !== log.startDate))
+            await removePeriodLog(log.startDate)
+          } catch (e) {
+            Alert.alert('Could not delete', apiErrorMessage(e))
+          }
+        },
+      },
+    ])
   }
 
   return (
@@ -128,6 +176,26 @@ export default function GirlCyclePanel({ accent, mode = 'record' }: { accent: st
             {formError ? <Text variant="caption" color={colors.danger}>{formError}</Text> : null}
             <Button title="Save period" onPress={saveLog} accent={accent} style={{ marginTop: spacing.sm }} />
           </View>
+          {periodLogs.length > 0 ? (
+            <View style={{ marginTop: spacing.md }}>
+              <Text variant="label">Logged periods</Text>
+              {periodLogs.slice(0, 6).map((log) => (
+                <View key={log.id ?? log.startDate} style={styles.logRow}>
+                  <Text variant="caption" style={{ flex: 1 }}>
+                    {log.startDate} · {log.duration} day{log.duration === 1 ? '' : 's'}
+                  </Text>
+                  <TouchableOpacity
+                    accessibilityRole="button"
+                    accessibilityLabel={`Delete period ${log.startDate}`}
+                    onPress={() => deleteLog(log)}
+                    hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                  >
+                    <Ionicons name="trash-outline" size={18} color={colors.danger} />
+                  </TouchableOpacity>
+                </View>
+              ))}
+            </View>
+          ) : null}
         </>
       ) : null}
       <Text variant="heading" style={{ marginTop: spacing.xl }}>Cycle calendar</Text>
@@ -150,6 +218,7 @@ const styles = StyleSheet.create({
   formField: { flex: 1 },
   durationField: { width: 88 },
   formPanel: { marginTop: spacing.md, padding: spacing.md, borderWidth: 1, borderRadius: radius.lg, backgroundColor: colors.gray100 },
+  logRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, paddingVertical: spacing.sm, borderBottomWidth: 1, borderBottomColor: colors.border },
   input: { borderWidth: 1, borderColor: colors.border, borderRadius: radius.md, paddingHorizontal: spacing.md, paddingVertical: spacing.sm, marginTop: spacing.xs, color: colors.text, backgroundColor: colors.gray100 },
   calendar: { marginTop: spacing.md, borderRadius: radius.md },
   legend: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.lg, marginTop: spacing.md },

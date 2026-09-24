@@ -1,5 +1,5 @@
 import React, { useCallback, useState } from 'react'
-import { Alert, StyleSheet, TextInput, TouchableOpacity, View } from 'react-native'
+import { Alert, Share, StyleSheet, TextInput, TouchableOpacity, View } from 'react-native'
 import { useFocusEffect } from '@react-navigation/native'
 import { Button, Card, Text } from './ui'
 import DateField from './DateField'
@@ -87,8 +87,9 @@ export default function HealthProfilePanel({ accent }: { accent: string }) {
     } catch (e) { Alert.alert('Could not save symptom', apiErrorMessage(e)) }
   }
 
-  const removeSymptom = async (value: string) => {
-    const next = (profile?.symptomsHistory ?? []).filter((s) => s !== value)
+  const removeSymptom = async (index: number) => {
+    const current = profile?.symptomsHistory ?? []
+    const next = current.filter((_, i) => i !== index)
     try {
       const res = await api.put<{ profile: Profile }>('/health/profile', { symptomsHistory: next })
       setProfile(res.data.profile)
@@ -107,8 +108,7 @@ export default function HealthProfilePanel({ accent }: { accent: string }) {
   const exportData = async () => {
     try {
       const res = await api.get('/health/export')
-      Alert.alert('Export ready', `Includes profile, ${res.data.periods?.length ?? 0} period logs, ${res.data.checkIns?.length ?? 0} check-ins.`)
-      console.log('[health-export]', JSON.stringify(res.data).slice(0, 2000))
+      await Share.share({ message: JSON.stringify(res.data, null, 2), title: 'MyCare+ health export' })
     } catch (e) { Alert.alert('Export failed', apiErrorMessage(e)) }
   }
 
@@ -150,8 +150,8 @@ export default function HealthProfilePanel({ accent }: { accent: string }) {
 
       <Text variant="label" style={styles.section}>Symptom history</Text>
       <View style={styles.chipWrap}>
-        {(profile?.symptomsHistory ?? []).map((s) => (
-          <TouchableOpacity key={s} onPress={() => removeSymptom(s)} style={styles.chip}>
+        {(profile?.symptomsHistory ?? []).map((s, i) => (
+          <TouchableOpacity key={`${s}-${i}`} accessibilityLabel={`Remove symptom ${s}`} onPress={() => removeSymptom(i)} style={styles.chip}>
             <Text variant="caption">{s} ✕</Text>
           </TouchableOpacity>
         ))}
@@ -185,6 +185,9 @@ export default function HealthProfilePanel({ accent }: { accent: string }) {
       <Text variant="label" style={styles.section}>Consent</Text>
       <Text variant="caption" muted>Current version: {profile?.consentVersion ?? consents[0]?.version ?? 'not recorded'}</Text>
       {consents.length > 0 ? <Text variant="caption" muted style={{ marginTop: 2 }}>History: {consents.map((c) => `${c.version} (${new Date(c.acceptedAt).toLocaleDateString()})`).join(' · ')}</Text> : null}
+      {profile?.consentVersion ?? consents[0]?.version ? (
+        <Text variant="caption" style={{ marginTop: spacing.sm, color: colors.success }}>Recorded — thank you. Re-accept below only if asked by the care team.</Text>
+      ) : null}
       <Button title="Accept health-data consent (v1)" onPress={acceptConsent} variant="secondary" style={{ marginTop: spacing.sm }} />
 
       <Text variant="label" style={styles.section}>Data controls</Text>

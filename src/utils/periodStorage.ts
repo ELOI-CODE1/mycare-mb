@@ -68,3 +68,34 @@ export const addPeriodLog = async (startDate: string, duration: number): Promise
 export const periodDays = (log: PeriodLog): string[] => {
   return Array.from({ length: log.duration }, (_, index) => format(addDays(parseISO(log.startDate), index), 'yyyy-MM-dd'));
 };
+
+// Queue of logs saved while offline — flushed to POST /health/periods when online.
+const PENDING_KEY = '@period_pending';
+
+export const loadPendingLogs = async (): Promise<PeriodLog[]> => {
+  try {
+    const data = await AsyncStorage.getItem(PENDING_KEY);
+    return data ? JSON.parse(data) : [];
+  } catch {
+    return [];
+  }
+};
+
+export const queuePendingLog = async (startDate: string, duration: number): Promise<void> => {
+  const pending = await loadPendingLogs();
+  const next = [...pending.filter((log) => log.startDate !== startDate), { startDate, duration }];
+  await AsyncStorage.setItem(PENDING_KEY, JSON.stringify(next));
+};
+
+export const dropPendingLog = async (startDate: string): Promise<void> => {
+  const pending = await loadPendingLogs();
+  await AsyncStorage.setItem(PENDING_KEY, JSON.stringify(pending.filter((log) => log.startDate !== startDate)));
+};
+
+export const removePeriodLog = async (startDate: string): Promise<PeriodLog[]> => {
+  const logs = await loadPeriodLogs();
+  const next = logs.filter((log) => log.startDate !== startDate);
+  await savePeriodLogs(next);
+  await dropPendingLog(startDate);
+  return next;
+};
